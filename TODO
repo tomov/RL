@@ -1,0 +1,55 @@
+compare with
+
+iterative policy evaluation p 99 of sutton & barto
+better: policy iteration p 105
+evern better: value iteration p 110
+
+async DP -- p 113
+
+on-policy monte carlo p 134
+better: incremental monte carlo p 139
+
+FUCK That -- TD p 145
+SARSA -- p 156
+Q learning p 158
+
+SARSA(lambda) p 184
+Q(lambda) p 187
+
+
+model-based: DP and heuristic search
+model-free: monte carlo & TD
+
+Dyna-Q -- p 203
+dyna-Q(lambda) ?
+stochastic dyna-Q -- belief states
+
+prioritized sweeping
+
+Kalman-TD
+implement Kalman, test w/ context task
+Kalman-dyna-TD?
+
+heuristic search = forward planning + TD(lambda) p 222
+
+gradient-descent sarsa(lambda)
+
+actor-critic? p 236
+
+
+two problems: policy evaluation = given policy, evaluate v(s)
+policy improvement = given v(s), find policy
+
+
+
+GOALS FOR TODAY:
+
+SARSA(lambda)
+
+optional: kalman-TD
+
+
+
+
+create base MDP class for Q, SARSA, and LMDP
+create separate environment from agent

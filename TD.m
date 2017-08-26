@@ -1,6 +1,7 @@
-% SARSA as in Sutton & Barto (2013)
+% TD-learning (SARSA and Q-learning) as in Sutton & Barto (2013)
+% TODO dedupe with LMDP
 %
-classdef SARSA < handle
+classdef TD < handle
 
     properties (Constant = true)
         % General
@@ -40,7 +41,7 @@ classdef SARSA < handle
 
         % Initialize an MDP from a maze
         %
-        function self = SARSA(map)
+        function self = TD(map)
             self.map = map; % so we can use pos2I
 
             absorbing_inds = find(ismember(map, self.absorbing_symbols)); % goal squares = internal states with corresponding boundary states
@@ -168,9 +169,9 @@ classdef SARSA < handle
             self.Q = Q;
         end
 
-        % Run an episode
+        % Run an episode and update Q-values using SARSA
         %
-        function [Rtot, path] = sample(self, s)
+        function [Rtot, path] = sampleSARSA(self, s)
             if ~exist('s', 'var')
                 s = find(self.map == self.agent_symbol);
             end
@@ -219,6 +220,59 @@ classdef SARSA < handle
                 
                 s = new_s;
                 a = new_a;
+            end
+            fprintf('Total reward: %d\n', Rtot);
+        end
+
+        % Run an episode and update Q-values using Q-learning
+        % TODO dedupe with sampleSARSA
+        %
+        function [Rtot, path] = sampleQ(self, s)
+            if ~exist('s', 'var')
+                s = find(self.map == self.agent_symbol);
+            end
+            assert(numel(find(self.I == s)) == 1);
+
+            Rtot = 0;
+            path = [];
+
+            map = self.map;
+            disp(map);
+            while true
+                Rtot = Rtot + self.R(s);
+                path = [path, s];
+
+                [x, y] = self.I2pos(s);
+                
+                a = self.eps_greedy(s);
+                new_s = samplePF(self.P(:,s,a));
+            
+                oldQ = self.Q(s,a); % for debugging
+                r = self.R(new_s);
+                pe = r + self.gamma * max(self.Q(new_s, :)) - self.Q(s, a);
+                self.Q(s,a) = self.Q(s,a) + self.alpha * pe;
+                
+                if ismember(new_s, self.B)
+                    % Boundary state
+                    %
+                fprintf('(%d, %d), %d --> END [%.2f%%], old Q = %.2f, pe = %.2f, Q = %.2f\n', x, y, a, self.P(new_s, s, a) * 100, oldQ, pe, self.Q(s, a));
+
+                    Rtot = Rtot + self.R(new_s);
+                    path = [path, new_s];
+                    break;
+                end
+
+                % Internal state
+                %
+                [new_x, new_y] = self.I2pos(new_s);
+                
+                map(x, y) = self.empty_symbol;
+                map(new_x, new_y) = self.agent_symbol;
+                
+                fprintf('(%d, %d), %d --> (%d, %d) [%.2f%%], old Q = %.2f, pe = %.2f, Q = %.2f\n', x, y, a, new_x, new_y, self.P(new_s, s, a) * 100, oldQ, pe, self.Q(s, a));
+                disp(map);
+                
+                s = new_s;
             end
             fprintf('Total reward: %d\n', Rtot);
         end

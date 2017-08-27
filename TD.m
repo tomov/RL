@@ -1,4 +1,4 @@
-% TD-learning (SARSA and Q-learning) as in Sutton & Barto (2013)
+% TD-learning (SARSA, Q-learning, and actor-critic) as in Sutton & Barto (2013)
 % TODO dedupe with LMDP
 %
 classdef TD < handle
@@ -10,6 +10,7 @@ classdef TD < handle
         alpha = 0.1; % learning rate
         gamma = 1; % discount rate
         eps = 0.1; % eps for eps-greedy
+        beta = 0.1; % learning rate for policy (actor-critic)
 
         % Maze
         %
@@ -26,11 +27,14 @@ classdef TD < handle
         A = []; % all actions
         R = []; % R(s) = instantaneous reward at state s
 
-        Q = []; % Q(s, a) = state-action value
+        Q = []; % Q(s, a) = state-action value, for SARSA and Q-learning
+        V = []; % V(s) = state value, for actor-critic
+        H = []; % H(s, a) = modifiable policy parameters, for actor-critic 
         P = []; % P(s', s, a) = P(s'|s,a) = probability of going to state s' from state s after taking action a
 
         I2B = []; % I2B(s) = corresponding B state for given I state s, or 0 if none
         B2I = []; % B2I(s) = corresponding I state for given B state s
+
 
         % Maze stuff
         %
@@ -68,6 +72,8 @@ classdef TD < handle
 
             P = zeros(N, N, numel(A)); % transitions P(s'|s,a); defaults to 0
             Q = zeros(N, numel(A)); % Q-values Q(s, a)
+            V = zeros(N, 1); % V-values V(s)
+            H = zeros(N, numel(A)); % policy parameters
             R = nan(N, 1); % instantaneous reward f'n R(s)
           
             % action 1 = stand still
@@ -167,6 +173,8 @@ classdef TD < handle
             self.P = P;
             self.R = R;
             self.Q = Q;
+            self.V = V;
+            self.H = H;
         end
 
         % Run an episode and update Q-values using SARSA
@@ -248,8 +256,7 @@ classdef TD < handle
                 new_s = samplePF(self.P(:,s,a));
             
                 oldQ = self.Q(s,a); % for debugging
-                r = self.R(new_s);
-                pe = r + self.gamma * max(self.Q(new_s, :)) - self.Q(s, a);
+                pe = self.R(new_s) + self.gamma * max(self.Q(new_s, :)) - self.Q(s, a);
                 self.Q(s,a) = self.Q(s,a) + self.alpha * pe;
                 
                 if ismember(new_s, self.B)
@@ -277,7 +284,61 @@ classdef TD < handle
             fprintf('Total reward: %d\n', Rtot);
         end
 
-        % Pick action a from state s using eps-greedy
+        % Run an episode and update V-values and policy using actor-critic
+        % TODO dedupe with sampleSARSA
+        %
+        function [Rtot, path] = sampleAC(self, s)
+            if ~exist('s', 'var')
+                s = find(self.map == self.agent_symbol);
+            end
+            assert(numel(find(self.I == s)) == 1);
+
+            Rtot = 0;
+            path = [];
+
+            map = self.map;
+            disp(map);
+            while true
+                Rtot = Rtot + self.R(s);
+                path = [path, s];
+
+                [x, y] = self.I2pos(s);
+                
+                a = self.softmax(s);
+                new_s = samplePF(self.P(:,s,a));
+            
+                oldV = self.V(s); % for debugging
+                pe = self.R(new_s) + self.gamma * self.V(new_s) - self.V(s);
+                self.V(s) = self.V(s) + self.alpha * pe;
+                self.H(s, a) = self.H(s, a) + self.beta * pe;
+                
+                if ismember(new_s, self.B)
+                    % Boundary state
+                    %
+                    fprintf('(%d, %d), %d --> END [%.2f%%], old V = %.2f, pe = %.2f, V = %.2f\n', x, y, a, self.P(new_s, s, a) * 100, oldV, pe, self.V(s));
+
+                    Rtot = Rtot + self.R(new_s);
+                    path = [path, new_s];
+                    break;
+                end
+
+                % Internal state
+                %
+                [new_x, new_y] = self.I2pos(new_s);
+                
+                map(x, y) = self.empty_symbol;
+                map(new_x, new_y) = self.agent_symbol;
+                
+                fprintf('(%d, %d), %d --> (%d, %d) [%.2f%%], old V = %.2f, pe = %.2f, V = %.2f\n', x, y, a, new_x, new_y, self.P(new_s, s, a) * 100, oldV, pe, self.V(s));
+                disp(map);
+                
+                s = new_s;
+            end
+            fprintf('Total reward: %d\n', Rtot);
+        end
+
+        % Pick action a from state s using eps-greedy based on Q-values
+        % used for SARSA and Q-learning
         %
         function a = eps_greedy(self, s)
             [~, a] = max(self.Q(s,:));
@@ -294,6 +355,15 @@ classdef TD < handle
                     a = datasample(setdiff(self.A, a), 1);
                 end
             end
+        end
+
+        % Pick action a from state s using softmax based on H policy parameters
+        % used for actor-critic
+        %
+        function a = softmax(self, s)
+            p = exp(self.H(s, :));
+            p = p / sum(p);
+            a = samplePF(p);
         end
 
         % Convert from maze position to internal state

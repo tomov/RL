@@ -10,6 +10,10 @@ L = TD([
 %    L.sampleSARSA();
 %end
 
+%for i = 1:20
+%    L.sampleQ();
+%end
+
 for i = 1:20
-    L.sampleQ();
+    L.sampleAC();
 end

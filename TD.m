@@ -11,6 +11,7 @@ classdef TD < handle
         gamma = 1; % discount rate
         eps = 0.1; % eps for eps-greedy
         beta = 0.1; % learning rate for policy (actor-critic)
+        GPI_threshold = 0.1; % threshold for convergence of V(s) during policy evaluation
 
         % Maze
         %
@@ -27,10 +28,12 @@ classdef TD < handle
         A = []; % all actions
         R = []; % R(s) = instantaneous reward at state s
 
+        P = []; % P(s', s, a) = P(s'|s,a) = probability of going to state s' from state s after taking action a
+
         Q = []; % Q(s, a) = state-action value, for SARSA and Q-learning
         V = []; % V(s) = state value, for actor-critic
         H = []; % H(s, a) = modifiable policy parameters, for actor-critic 
-        P = []; % P(s', s, a) = P(s'|s,a) = probability of going to state s' from state s after taking action a
+        pi = []; % pi(s) = policy = what action to take in state s (deterministic), for policy iteration
 
         I2B = []; % I2B(s) = corresponding B state for given I state s, or 0 if none
         B2I = []; % B2I(s) = corresponding I state for given B state s
@@ -175,6 +178,46 @@ classdef TD < handle
             self.Q = Q;
             self.V = V;
             self.H = H;
+        end
+
+        % Solve using generalized policy iteration.
+        % Notice that the resulting policy is deterministic
+        %
+        function solveGPI(self)
+            N = numel(self.S);
+            pi = randint(numel(self.A), [N 1]);
+
+            policy_stable = false;
+            while ~policy_stable
+                % policy evaluation
+                %
+                delta = Inf;
+                while delta > self.GPI_threshold
+                    delta = 0;
+                    for s = self.S
+                        v = self.V(s);
+                        a = pi(s);
+                        self.V(s) = sum(self.P(:, s, a) .* (self.R(:) + self.gamma * self.V(:)));
+                        delta = max(delta, v - self.V(s));
+                    end
+                end
+
+                % policy improvement
+                %
+                policy_stable = true;
+                for s = self.S
+                    old_a = pi(s);
+                    [~, pi(s)] = max();
+                end
+            end
+
+            self.pi = pi;
+        end
+
+        % Sample paths from deterministic policy pi generated using generalized policy iteration
+        %
+        function [Rtot, path] = sampleGPI(self, s)
+            f
         end
 
         % Run an episode and update Q-values using SARSA

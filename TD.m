@@ -227,162 +227,148 @@ classdef TD < handle
             self.pi = pi;
         end
 
-        % Sample paths from deterministic policy pi generated using generalized policy iteration
-        % TODO dedupe with sampleEverything...
         %
-        function [Rtot, path] = sampleGPI(self, s, do_print)
+        % Sample paths from deterministic policy pi generated using generalized policy iteration
+        %
+
+        function res = sampleGPI(varargin)
+            self = varargin{1};
+            res = self.sample_helper(@self.init_sampleGPI, @self.stepGPI, varargin{2:end});
+        end
+
+        function state = init_sampleGPI(self, s)
             if ~exist('s', 'var')
                 s = find(self.map == self.agent_symbol);
             end
-            if ~exist('do_print', 'var')
-                do_print = false;
-            end
             assert(numel(find(self.I == s)) == 1);
 
-            Rtot = 0;
-            path = [];
-
-            map = self.map;
-            if do_print, disp(map); end
-            while true
-                Rtot = Rtot + self.R(s);
-                path = [path, s];
-
-                [x, y] = self.I2pos(s);
-                
-                a = self.pi(s);
-                new_s = samplePF(self.P(:,s,a));
-
-                if ismember(new_s, self.B)
-                    % Boundary state
-                    %
-                    if do_print, fprintf('(%d, %d), %d --> END [%.2f%%]\n', x, y, a, self.P(new_s, s, a) * 100); end
-
-                    Rtot = Rtot + self.R(new_s);
-                    path = [path, new_s];
-                    break;
-                end
-
-                % Internal state
-                %
-                [new_x, new_y] = self.I2pos(new_s);
-                
-                map(x, y) = self.empty_symbol;
-                map(new_x, new_y) = self.agent_symbol;
-                
-                if do_print, fprintf('(%d, %d), %d --> (%d, %d) [%.2f%%]\n', x, y, a, new_x, new_y, self.P(new_s, s, a) * 100); end
-                if do_print, disp(map); end
-                
-                s = new_s;
-            end
-            if do_print, fprintf('Total reward: %d\n', Rtot); end
+            state.Rtot = 0;
+            state.path = [];
+            state.s = s;
+            state.a = -1;
+            state.done = false;
         end
 
+        function state = stepGPI(self, state)
+            state.Rtot = state.Rtot + self.R(state.s);
+            state.path = [state.path, state.s];
+
+            a = self.pi(state.s);
+            new_s = samplePF(self.P(:, state.s, a));
+
+            if ismember(new_s, self.B)
+                % Boundary state
+                %
+                state.Rtot = state.Rtot + self.R(new_s);
+                state.path = [state.path, new_s];
+                state.done = true;
+            end
+
+            state.a = a;
+            state.s = new_s;
+        end
+
+        %
         % Run an episode and update Q-values using SARSA
         %
-        function [Rtot, path] = sampleSARSA(self, s)
-            if ~exist('s', 'var')
-                s = find(self.map == self.agent_symbol);
-            end
-            assert(numel(find(self.I == s)) == 1);
 
-            Rtot = 0;
-            path = [];
-
-            a = self.eps_greedy(s);
-            
-            map = self.map;
-            disp(map);
-            while true
-                Rtot = Rtot + self.R(s);
-                path = [path, s];
-
-                [x, y] = self.I2pos(s);
-                
-                new_s = samplePF(self.P(:,s,a));
-                new_a = self.eps_greedy(new_s);
-
-                oldQ = self.Q(s,a); % for debugging
-                r = self.R(new_s);
-                pe = r + self.gamma * self.Q(new_s, new_a) - self.Q(s, a);
-                self.Q(s,a) = self.Q(s,a) + self.alpha * pe;
-                
-                if ismember(new_s, self.B)
-                    % Boundary state
-                    %
-                    fprintf('(%d, %d), %d --> END [%.2f%%], old Q = %.2f, pe = %.2f, Q = %.2f\n', x, y, a, self.P(new_s, s, a) * 100, oldQ, pe, self.Q(s, a));
-
-                    Rtot = Rtot + self.R(new_s);
-                    path = [path, new_s];
-                    break;
-                end
-
-                % Internal state
-                %
-                [new_x, new_y] = self.I2pos(new_s);
-                
-                map(x, y) = self.empty_symbol;
-                map(new_x, new_y) = self.agent_symbol;
-                
-                fprintf('(%d, %d), %d --> (%d, %d), %d [%.2f%%], old Q = %.2f, pe = %.2f, Q = %.2f\n', x, y, a, new_x, new_y, new_a, self.P(new_s, s, a) * 100, oldQ, pe, self.Q(s, a));
-                disp(map);
-                
-                s = new_s;
-                a = new_a;
-            end
-            fprintf('Total reward: %d\n', Rtot);
+        function res = sampleSARSA(varargin)
+            self = varargin{1};
+            res = self.sample_helper(@self.init_sampleSARSA, @self.stepSARSA, varargin{2:end});
         end
 
-        % Run an episode and update Q-values using Q-learning
-        % TODO dedupe with sampleSARSA
-        %
-        function [Rtot, path] = sampleQ(self, s)
+        function state = init_sampleSARSA(self, s)
             if ~exist('s', 'var')
                 s = find(self.map == self.agent_symbol);
             end
             assert(numel(find(self.I == s)) == 1);
 
-            Rtot = 0;
-            path = [];
+            state.Rtot = 0;
+            state.path = [];
+            state.s = s;
+            state.a = self.eps_greedy(s);
+            state.done = false;
+            state.r = 0;
+            state.pe = 0;
+        end
+           
+        function state = stepSARSA(self, state)
+            s = state.s;
+            a = state.a;
 
-            map = self.map;
-            disp(map);
-            while true
-                Rtot = Rtot + self.R(s);
-                path = [path, s];
+            state.Rtot = state.Rtot + self.R(s);
+            state.path = [state.path, s];
 
-                [x, y] = self.I2pos(s);
-                
-                a = self.eps_greedy(s);
-                new_s = samplePF(self.P(:,s,a));
+            new_s = samplePF(self.P(:, s, a));
+            new_a = self.eps_greedy(new_s);
+
+            r = self.R(new_s);
+            pe = r + self.gamma * self.Q(new_s, new_a) - self.Q(s, a);
+            self.Q(s,a) = self.Q(s,a) + self.alpha * pe;
             
-                oldQ = self.Q(s,a); % for debugging
-                pe = self.R(new_s) + self.gamma * max(self.Q(new_s, :)) - self.Q(s, a);
-                self.Q(s,a) = self.Q(s,a) + self.alpha * pe;
-                
-                if ismember(new_s, self.B)
-                    % Boundary state
-                    %
-                    fprintf('(%d, %d), %d --> END [%.2f%%], old Q = %.2f, pe = %.2f, Q = %.2f\n', x, y, a, self.P(new_s, s, a) * 100, oldQ, pe, self.Q(s, a));
-
-                    Rtot = Rtot + self.R(new_s);
-                    path = [path, new_s];
-                    break;
-                end
-
-                % Internal state
+            if ismember(new_s, self.B)
+                % Boundary state
                 %
-                [new_x, new_y] = self.I2pos(new_s);
-                
-                map(x, y) = self.empty_symbol;
-                map(new_x, new_y) = self.agent_symbol;
-                
-                fprintf('(%d, %d), %d --> (%d, %d) [%.2f%%], old Q = %.2f, pe = %.2f, Q = %.2f\n', x, y, a, new_x, new_y, self.P(new_s, s, a) * 100, oldQ, pe, self.Q(s, a));
-                disp(map);
-                
-                s = new_s;
+                state.Rtot = state.Rtot + self.R(new_s);
+                state.path = [state.path, new_s];
+                state.done = true;
             end
-            fprintf('Total reward: %d\n', Rtot);
+
+            state.s = new_s;
+            state.a = new_a;
+            state.r = r;
+            state.pe = pe;
+        end
+
+        %
+        % Run an episode and update Q-values using Q-learning
+        %
+
+        function res = sampleQ(varargin)
+            self = varargin{1};
+            res = self.sample_helper(@self.init_sampleQ, @self.stepQ, varargin{2:end});
+        end
+
+        function state = init_sampleQ(self, s)
+            if ~exist('s', 'var')
+                s = find(self.map == self.agent_symbol);
+            end
+            assert(numel(find(self.I == s)) == 1);
+
+            state.Rtot = 0;
+            state.path = [];
+            state.s = s;
+            state.a = -1;
+            state.done = false;
+            state.r = 0;
+            state.pe = 0;
+        end
+
+        function state = stepQ(self, state)
+            s = state.s;
+
+            state.Rtot = state.Rtot + self.R(s);
+            state.path = [state.path, s];
+
+            a = self.eps_greedy(s);
+            new_s = samplePF(self.P(:,s,a));
+       
+            r = self.R(new_s);
+            pe = r + self.gamma * max(self.Q(new_s, :)) - self.Q(s, a);
+            self.Q(s,a) = self.Q(s,a) + self.alpha * pe;
+            
+            if ismember(new_s, self.B)
+                % Boundary state
+                %
+                state.Rtot = state.Rtot + self.R(new_s);
+                state.path = [state.path, new_s];
+                state.done = true;
+            end
+
+            state.s = new_s;
+            state.a = a;
+            state.r = r;
+            state.pe = pe;
         end
 
         % Run an episode and update V-values and policy using actor-critic
@@ -436,6 +422,43 @@ classdef TD < handle
                 s = new_s;
             end
             fprintf('Total reward: %d\n', Rtot);
+        end
+
+        % Generic function that samples paths given a state initializer and a step function
+        %
+        function [Rtot, path] = sample_helper(self, init_fn, step_fn, s, do_print)
+            if ~exist('s', 'var')
+                state = init_fn();
+            else
+                state = init_fn(s);
+            end
+            if ~exist('do_print', 'var')
+                do_print = false;
+            end
+
+            map = self.map;
+            if do_print, disp(map); end
+            while ~state.done
+                [x, y] = self.I2pos(state.s);
+                old_s = state.s;
+                old_a = state.a;
+               
+                state = step_fn(state); 
+
+                if state.done
+                    %if do_print, fprintf('(%d, %d), %d --> END [%.2f%%]\n', x, y, old_a, self.P(state.s, old_s, old_a) * 100); end
+                else
+                    [new_x, new_y] = self.I2pos(state.s);
+                    map(x, y) = self.empty_symbol;
+                    map(new_x, new_y) = self.agent_symbol;
+                    %if do_print, fprintf('(%d, %d), %d --> (%d, %d) [%.2f%%]\n', x, y, old_a, new_x, new_y, self.P(state.s, old_s, old_a) * 100); end
+                    if do_print, disp(map); end
+                end
+            end
+            if do_print, fprintf('Total reward: %d\n', state.Rtot); end
+
+            Rtot = state.Rtot;
+            path = state.path;
         end
 
         % Pick action a from state s using eps-greedy based on Q-values

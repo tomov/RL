@@ -306,7 +306,7 @@ classdef LMDP < handle
             state.Rtot = state.Rtot + self.R(state.s);
             state.path = [state.path, state.s];
 
-            new_s = samplePF(self.a(:,state.s));        
+            new_s = samplePF(self.a(:, state.s));        
 
             if ismember(new_s, self.B)
                 % Boundary state
@@ -316,8 +316,6 @@ classdef LMDP < handle
                 state.done = true;
             end
 
-            % Internal state
-            %
             state.s = new_s;
         end
 

@@ -172,19 +172,19 @@ T = TD([
     '.....']);
 
 %for i = 1:20
-%    T.sampleSARSA();
+%    T.sampleSARSA(find(map == 'X'), true);
 %end
 
-%for i = 1:20
-%    T.sampleQ();
-%end
+for i = 1:20
+    T.sampleQ(find(map == 'X'), true);
+end
 
 %for i = 1:20
 %    T.sampleAC();
 %end
 
-T.solveGPI();
-T.sampleGPI();
+%T.solveGPI();
+%T.sampleGPI();
 
 %% Options framework
 %

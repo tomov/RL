@@ -257,6 +257,8 @@ classdef TD < handle
             state.path = [];
             state.s = s;
             state.a = self.pi(s);
+            state.pi = zeros(size(self.A));
+            state.pi(state.a) = 1;
             state.done = false;
             state.method = 'GPI';
         end
@@ -270,6 +272,8 @@ classdef TD < handle
 
             new_s = samplePF(self.P(:, s, a));
             new_a = self.pi(new_s);
+            pi = zeros(size(self.A));
+            pi(a) = 1;
 
             if ismember(new_s, self.B)
                 % Boundary state
@@ -282,6 +286,7 @@ classdef TD < handle
                 %
                 state.s = new_s;
                 state.a = new_a;
+                state.pi = pi;
             end
         end
 
@@ -308,7 +313,9 @@ classdef TD < handle
             state.Rtot = 0;
             state.path = [];
             state.s = s;
-            state.a = self.eps_greedy(s); % notice for SARSA, a is the action we took from state s, NOT the action that got us to state s (unlike for the others)
+            pi = self.eps_greedy(s);
+            state.pi = pi;
+            state.a = samplePF(pi);
             state.done = false;
             state.method = 'SARSA';
             state.r = 0;
@@ -323,7 +330,8 @@ classdef TD < handle
             state.path = [state.path, s];
 
             new_s = samplePF(self.P(:, s, a));
-            new_a = self.eps_greedy(new_s);
+            pi = self.eps_greedy(new_s);
+            new_a = samplePF(pi);
 
             r = self.R(new_s);
             pe = r + self.gamma * self.Q(new_s, new_a) - self.Q(s, a);
@@ -342,6 +350,7 @@ classdef TD < handle
                 state.a = new_a;
                 state.r = r;
                 state.pe = pe;
+                state.pi = pi;
             end
         end
 
@@ -368,7 +377,9 @@ classdef TD < handle
             state.Rtot = 0;
             state.path = [];
             state.s = s;
-            state.a = self.eps_greedy(s);
+            pi = self.eps_greedy(s);
+            state.pi = pi;
+            state.a = samplePF(pi);
             state.done = false;
             state.method = 'Q';
             state.r = 0;
@@ -383,7 +394,8 @@ classdef TD < handle
             state.path = [state.path, s];
 
             new_s = samplePF(self.P(:,s,a));
-            new_a = self.eps_greedy(new_s);
+            pi = self.eps_greedy(new_s);
+            new_a = samplePF(pi);
        
             r = self.R(new_s);
             pe = r + self.gamma * max(self.Q(new_s, :)) - self.Q(s, a);
@@ -402,6 +414,7 @@ classdef TD < handle
                 state.a = new_a;
                 state.r = r;
                 state.pe = pe;
+                state.pi = pi;
             end
         end
 
@@ -428,7 +441,9 @@ classdef TD < handle
             state.Rtot = 0;
             state.path = [];
             state.s = s;
-            state.a = self.softmax(s);
+            pi = self.softmax(s);
+            state.pi = pi;
+            state.a = samplePF(pi);
             state.done = false;
             state.method = 'AC';
             state.r = 0;
@@ -443,7 +458,8 @@ classdef TD < handle
             state.path = [state.path, s];
 
             new_s = samplePF(self.P(:,s,a));
-            new_a = self.softmax(new_s);
+            pi = self.softmax(new_s);
+            new_a = samplePF(pi);
        
             r = self.R(new_s);
             pe = r + self.gamma * self.V(new_s) - self.V(s);
@@ -463,6 +479,7 @@ classdef TD < handle
                 state.a = new_a;
                 state.r = r;
                 state.pe = pe;
+                state.pi = pi;
             end
         end
 
@@ -524,20 +541,20 @@ classdef TD < handle
             sample_callback = @(hObject, eventdata) self.sample_gui_callback(step_fn, hObject, eventdata);
 
             self.gui_timer = timer('Period', 0.1, 'TimerFcn', step_callback, 'ExecutionMode', 'fixedRate', 'TasksToExecute', 1000000);
-			uicontrol('Style', 'pushbutton', 'String', 'Step', ...
-			  		 'Position', [10 10 70 20], ...
-			  		 'Callback', step_callback);
 			uicontrol('Style', 'pushbutton', 'String', 'Start', ...
-			  		 'Position', [10 30 70 20], ...
+			  		 'Position', [10 90 70 20], ...
 			  		 'Callback', start_callback);
-			uicontrol('Style', 'pushbutton', 'String', 'Reset', ...
-					 'Position', [10 50 70 20], ...
-					 'Callback', reset_callback);
 			uicontrol('Style', 'pushbutton', 'String', 'Stop', ...
 					 'Position', [10 70 70 20], ...
 					 'Callback', stop_callback);
+			uicontrol('Style', 'pushbutton', 'String', 'Reset', ...
+					 'Position', [10 50 70 20], ...
+					 'Callback', reset_callback);
+			uicontrol('Style', 'pushbutton', 'String', 'Step', ...
+			  		 'Position', [10 30 70 20], ...
+			  		 'Callback', step_callback);
 			uicontrol('Style', 'pushbutton', 'String', 'Skip', ...
-					 'Position', [10 90 70 20], ...
+					 'Position', [10 10 70 20], ...
 					 'Callback', sample_callback);
         end
 
@@ -582,9 +599,9 @@ classdef TD < handle
 
             % plot map and current state-value f'n V(s)
             %
-            subplot(1, 3, 1);
+            subplot(1, 4, 1);
             vi = self.V(self.I);
-            imagesc(log(reshape(vi, size(self.map))));
+            imagesc(reshape(vi, size(self.map)));
             [x, y] = ind2sub(size(self.map), self.gui_state.s);
             text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
             label = sprintf('Total reward: %.2f, steps: %d', self.gui_state.Rtot, numel(self.gui_state.path));
@@ -594,54 +611,68 @@ classdef TD < handle
                 xlabel(label);
             end
             title('state-value function V(.)');
-
-            % plot map and current transition probability f'n P(.|s,a)
-            %
-            subplot(1, 3, 2);
-            p = self.P(self.I, self.gui_state.s, self.gui_state.a);
-            imagesc(log(reshape(p, size(self.map))));
-            [x, y] = ind2sub(size(self.map), self.gui_state.s);
-            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
-            title('transition probability P(.|s,a)');
+            ylabel(self.gui_state.method);
 
             % plot map and current action-value f'n max Q(s, a)
             %
-            subplot(1, 3, 3);
+            subplot(1, 4, 2);
             qi = self.Q(self.I, :);
             qi = max(qi, [], 2);
-            imagesc(log(reshape(qi, size(self.map))));
+            imagesc(reshape(qi, size(self.map)));
             [x, y] = ind2sub(size(self.map), self.gui_state.s);
             text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
             title('action-value function max_a Q(.,a)');
+
+            % plot map and current transition probability given the selected action, P(.|s,a)
+            %
+            subplot(1, 4, 3);
+            p = self.P(self.I, self.gui_state.s, self.gui_state.a);
+            imagesc(reshape(p, size(self.map)));
+            [x, y] = ind2sub(size(self.map), self.gui_state.s);
+            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
+            title('transition probability for chosen action P(.|s,a)');
+
+            % plot map and transition probability across all possible actions, P(.|s)
+            %
+            subplot(1, 4, 4);
+            pi = self.gui_state.pi';
+            p = squeeze(self.P(self.I, self.gui_state.s, :));
+            p = p * pi;
+            imagesc(reshape(p, size(self.map)));
+            [x, y] = ind2sub(size(self.map), self.gui_state.s);
+            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
+            title('transition probability P(.|s)');
+
         end
 
         % Pick action a from state s using eps-greedy based on Q-values
+        % Returns the action PF
         % used for SARSA and Q-learning
         %
-        function a = eps_greedy(self, s)
+        function p = eps_greedy(self, s)
             [~, a] = max(self.Q(s,:));
             if numel(unique(self.Q(s,:))) == 1
                 % no max => choose at random
                 %
-                a = datasample(self.A, 1);
+                p = ones(size(self.A));
+                p = p / sum(p);
             else
                 % return best action
+                % with small probability eps, return another action at random
                 %
-                if rand() < self.eps
-                    % with small probability eps, return another action at random
-                    %
-                    a = datasample(setdiff(self.A, a), 1);
-                end
+                p = ones(size(self.A)) * self.eps / (numel(self.A) - 1);
+                p(a) = 1 - self.eps;
+                assert(abs(sum(p) - 1) < 1e-8);
             end
         end
 
         % Pick action a from state s using softmax based on H policy parameters
+        % Returns the action PF
         % used for actor-critic
         %
-        function a = softmax(self, s)
+        function p = softmax(self, s)
             p = exp(self.H(s, :));
             p = p / sum(p);
-            a = samplePF(p);
         end
 
         % Convert from maze position to internal state

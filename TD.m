@@ -623,25 +623,25 @@ classdef TD < handle
             text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
             title('action-value function max_a Q(.,a)');
 
-            % plot map and current transition probability given the selected action, P(.|s,a)
-            %
-            subplot(1, 4, 3);
-            p = self.P(self.I, self.gui_state.s, self.gui_state.a);
-            imagesc(reshape(p, size(self.map)));
-            [x, y] = ind2sub(size(self.map), self.gui_state.s);
-            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
-            title('transition probability for chosen action P(.|s,a)');
-
             % plot map and transition probability across all possible actions, P(.|s)
             %
-            subplot(1, 4, 4);
+            subplot(1, 4, 3);
             pi = self.gui_state.pi';
             p = squeeze(self.P(self.I, self.gui_state.s, :));
             p = p * pi;
             imagesc(reshape(p, size(self.map)));
             [x, y] = ind2sub(size(self.map), self.gui_state.s);
             text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
-            title('transition probability P(.|s)');
+            title('policy P(.|s)');
+
+            % plot map and current transition probability given the selected action, P(.|s,a)
+            %
+            subplot(1, 4, 4);
+            p = self.P(self.I, self.gui_state.s, self.gui_state.a);
+            imagesc(reshape(p, size(self.map)));
+            [x, y] = ind2sub(size(self.map), self.gui_state.s);
+            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
+            title('transition probability for chosen action P(.|s,a)');
 
         end
 

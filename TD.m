@@ -42,8 +42,9 @@ classdef TD < handle
 
         % GUI
         %
-        state_gui = []; % state for the GUI step-through
-        map_gui = []; % figure for the GUI
+        gui_state = []; % state for the GUI step-through
+        gui_map = []; % figure for the GUI
+        gui_timer = []; % timer for the GUI
     end
    
     methods
@@ -255,16 +256,20 @@ classdef TD < handle
             state.Rtot = 0;
             state.path = [];
             state.s = s;
-            state.a = -1;
+            state.a = self.pi(s);
             state.done = false;
+            state.method = 'GPI';
         end
 
         function state = stepGPI(self, state)
-            state.Rtot = state.Rtot + self.R(state.s);
-            state.path = [state.path, state.s];
+            s = state.s;
+            a = state.a;
 
-            a = self.pi(state.s);
-            new_s = samplePF(self.P(:, state.s, a));
+            state.Rtot = state.Rtot + self.R(s);
+            state.path = [state.path, s];
+
+            new_s = samplePF(self.P(:, s, a));
+            new_a = self.pi(new_s);
 
             if ismember(new_s, self.B)
                 % Boundary state
@@ -275,8 +280,8 @@ classdef TD < handle
             else
                 % Internal state
                 %
-                state.a = a;
                 state.s = new_s;
+                state.a = new_a;
             end
         end
 
@@ -287,6 +292,11 @@ classdef TD < handle
         function res = sampleSARSA(varargin)
             self = varargin{1};
             res = self.sample_helper(@self.init_sampleSARSA, @self.stepSARSA, varargin{2:end});
+        end
+
+        function sampleSARSA_gui(varargin)
+            self = varargin{1};
+            self.sample_gui_helper(@self.init_sampleSARSA, @self.stepSARSA, varargin{2:end});
         end
 
         function state = init_sampleSARSA(self, s)
@@ -300,6 +310,7 @@ classdef TD < handle
             state.s = s;
             state.a = self.eps_greedy(s); % notice for SARSA, a is the action we took from state s, NOT the action that got us to state s (unlike for the others)
             state.done = false;
+            state.method = 'SARSA';
             state.r = 0;
             state.pe = 0;
         end
@@ -343,6 +354,11 @@ classdef TD < handle
             res = self.sample_helper(@self.init_sampleQ, @self.stepQ, varargin{2:end});
         end
 
+        function sampleQ_gui(varargin)
+            self = varargin{1};
+            self.sample_gui_helper(@self.init_sampleQ, @self.stepQ, varargin{2:end});
+        end
+
         function state = init_sampleQ(self, s)
             if ~exist('s', 'var')
                 s = find(self.map == self.agent_symbol);
@@ -352,20 +368,22 @@ classdef TD < handle
             state.Rtot = 0;
             state.path = [];
             state.s = s;
-            state.a = -1;
+            state.a = self.eps_greedy(s);
             state.done = false;
+            state.method = 'Q';
             state.r = 0;
             state.pe = 0;
         end
 
         function state = stepQ(self, state)
             s = state.s;
+            a = state.a;
 
             state.Rtot = state.Rtot + self.R(s);
             state.path = [state.path, s];
 
-            a = self.eps_greedy(s);
             new_s = samplePF(self.P(:,s,a));
+            new_a = self.eps_greedy(new_s);
        
             r = self.R(new_s);
             pe = r + self.gamma * max(self.Q(new_s, :)) - self.Q(s, a);
@@ -391,6 +409,11 @@ classdef TD < handle
         % Run an episode and update V-values and policy using actor-critic
         %
 
+        function sampleAC_gui(varargin)
+            self = varargin{1};
+            self.sample_gui_helper(@self.init_sampleAC, @self.stepAC, varargin{2:end});
+        end
+
         function res = sampleAC(varargin)
             self = varargin{1};
             res = self.sample_helper(@self.init_sampleAC, @self.stepAC, varargin{2:end});
@@ -405,20 +428,22 @@ classdef TD < handle
             state.Rtot = 0;
             state.path = [];
             state.s = s;
-            state.a = -1;
+            state.a = self.softmax(s);
             state.done = false;
+            state.method = 'AC';
             state.r = 0;
             state.pe = 0;
         end
 
         function state = stepAC(self, state)
             s = state.s;
+            a = state.a;
 
             state.Rtot = state.Rtot + self.R(s);
             state.path = [state.path, s];
 
-            a = self.softmax(s);
             new_s = samplePF(self.P(:,s,a));
+            new_a = self.softmax(new_s);
        
             r = self.R(new_s);
             pe = r + self.gamma * self.V(new_s) - self.V(s);
@@ -463,12 +488,12 @@ classdef TD < handle
                 state = step_fn(state); 
 
                 if state.done
-                    %if do_print, fprintf('(%d, %d), %d --> END [%.2f%%]\n', x, y, old_a, self.P(state.s, old_s, old_a) * 100); end
+                    if do_print, fprintf('(%d, %d), %d --> END [%.2f%%]\n', x, y, old_a, self.P(state.s, old_s, old_a) * 100); end
                 else
                     [new_x, new_y] = self.I2pos(state.s);
                     map(x, y) = self.empty_symbol;
                     map(new_x, new_y) = self.agent_symbol;
-                    %if do_print, fprintf('(%d, %d), %d --> (%d, %d) [%.2f%%]\n', x, y, old_a, new_x, new_y, self.P(state.s, old_s, old_a) * 100); end
+                    if do_print, fprintf('(%d, %d), %d --> (%d, %d) [%.2f%%]\n', x, y, old_a, new_x, new_y, self.P(state.s, old_s, old_a) * 100); end
                     if do_print, disp(map); end
                 end
             end
@@ -484,46 +509,110 @@ classdef TD < handle
 
         function sample_gui_helper(self, init_fn, step_fn, s)
             if ~exist('s', 'var')
-                self.state_gui = init_fn();
+                self.gui_state = init_fn();
             else
-                self.state_gui = init_fn(s);
+                self.gui_state = init_fn(s);
             end
 
-			self.map_gui = figure;
+			self.gui_map = figure;
             self.plot_gui();
 
             step_callback = @(hObject, eventdata) self.step_gui_callback(step_fn, hObject, eventdata);
+            start_callback = @(hObject, eventdata) self.start_gui_callback(hObject, eventdata);
+            reset_callback = @(hObject, eventdata) self.reset_gui_callback(init_fn, hObject, eventdata);
+            stop_callback = @(hObject, eventdata) stop(self.gui_timer);
+            sample_callback = @(hObject, eventdata) self.sample_gui_callback(step_fn, hObject, eventdata);
 
-			step_button = uicontrol('Style', 'pushbutton', 'String', 'Step', ...
-									 'Position', [10 10 70 20], ...
-									 'Callback', step_callback);
+            self.gui_timer = timer('Period', 0.1, 'TimerFcn', step_callback, 'ExecutionMode', 'fixedRate', 'TasksToExecute', 1000000);
+			uicontrol('Style', 'pushbutton', 'String', 'Step', ...
+			  		 'Position', [10 10 70 20], ...
+			  		 'Callback', step_callback);
+			uicontrol('Style', 'pushbutton', 'String', 'Start', ...
+			  		 'Position', [10 30 70 20], ...
+			  		 'Callback', start_callback);
+			uicontrol('Style', 'pushbutton', 'String', 'Reset', ...
+					 'Position', [10 50 70 20], ...
+					 'Callback', reset_callback);
+			uicontrol('Style', 'pushbutton', 'String', 'Stop', ...
+					 'Position', [10 70 70 20], ...
+					 'Callback', stop_callback);
+			uicontrol('Style', 'pushbutton', 'String', 'Skip', ...
+					 'Position', [10 90 70 20], ...
+					 'Callback', sample_callback);
         end
 
-        function step_gui_callback(self, step_fn, hObject, eventdata, handles)
-            if self.state_gui.done
+        % Single action
+        %
+        function step_gui_callback(self, step_fn, hObject, eventdata)
+            if self.gui_state.done
+                stop(self.gui_timer);
                 return
             end
 
-            self.state_gui = step_fn(self.state_gui);
+            self.gui_state = step_fn(self.gui_state);
             self.plot_gui();
         end
 
-        function plot_gui(self)
-            figure(self.map_gui);
+        % Animate entire episode until the end
+        %
+        function start_gui_callback(self, hObject, eventdata)
+            start(self.gui_timer);
+        end
 
-            % plot map and current value f'n
+        % Reset the state
+        %
+        function reset_gui_callback(self, init_fn, hObject, eventdata)
+            self.gui_state = init_fn(self.gui_state.path(1));
+            self.plot_gui();
+        end
+
+        % Run entire episode until the end
+        %
+        function sample_gui_callback(self, step_fn, hObject, eventdata)
+            while ~self.gui_state.done
+                self.gui_state = step_fn(self.gui_state);
+            end
+            self.plot_gui();
+        end
+
+        % Plot the GUI
+        %
+        function plot_gui(self)
+            figure(self.gui_map);
+
+            % plot map and current state-value f'n V(s)
             %
-            subplot(1, 2, 1);
+            subplot(1, 3, 1);
             vi = self.V(self.I);
             imagesc(log(reshape(vi, size(self.map))));
-            [x, y] = ind2sub(size(self.map), self.state_gui.s);
+            [x, y] = ind2sub(size(self.map), self.gui_state.s);
             text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
-            if self.state_gui.done
-                xlabel(sprintf('FINISHED Total reward: %.2f', self.state_gui.Rtot));
+            label = sprintf('Total reward: %.2f, steps: %d', self.gui_state.Rtot, numel(self.gui_state.path));
+            if self.gui_state.done
+                xlabel(['FINISHED!: ', label]);
             else
-                xlabel(sprintf('Total reward: %.2f', self.state_gui.Rtot));
+                xlabel(label);
             end
-            title('Value function V');
+            title('state-value function V(.)');
+
+            % plot map and current transition probability f'n P(.|s,a)
+            %
+            subplot(1, 3, 2);
+            p = self.P(self.I, self.gui_state.s, self.gui_state.a);
+            imagesc(log(reshape(p, size(self.map))));
+            [x, y] = ind2sub(size(self.map), self.gui_state.s);
+            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
+            title('transition probability P(.|s,a)');
+
+            % plot map and current action-value f'n max Q(s, a)
+            %
+            subplot(1, 3, 3);
+            qi = self.Q(self.I, :);
+            qi = max(qi, [], 2);
+            imagesc(log(reshape(qi, size(self.map))));
+            [x, y] = ind2sub(size(self.map), self.gui_state.s);
+            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
+            title('action-value function max_a Q(.,a)');
         end
 
         % Pick action a from state s using eps-greedy based on Q-values

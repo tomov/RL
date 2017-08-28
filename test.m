@@ -174,17 +174,20 @@ T = TD([
 %for i = 1:20
 %    T.sampleSARSA(find(map == 'X'), true);
 %end
+%T.sampleSARSA_gui();
 
 %for i = 1:20
 %    T.sampleQ(find(map == 'X'), true);
 %end
+%T.sampleQ_gui();
 
 %for i = 1:20
 %    T.sampleAC(find(map == 'X'), true);
 %end
+T.sampleAC_gui();
 
-T.solveGPI();
-T.sampleGPI_gui();
+%T.solveGPI();
+%T.sampleGPI_gui();
 
 %% Options framework
 %

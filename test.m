@@ -108,7 +108,9 @@ map = [
     '.0S....S#..';
     '.....#..$..'];
 H = HMLMDP(map);
-H.sample();
+%H.sample();
+H.sample_gui();
+
 
 %% Big full HMLMDP
 %
@@ -128,9 +130,10 @@ map = [
     '........#..';
     '.....#..$..'];
 H = HMLMDP(map, true);
-H.sample();
+%H.sample();
+H.sample_gui();
 
-H.plotZi();
+%H.plotZi();
 
 
 %% Big full HMLMDP + decomposition of Zi
@@ -138,6 +141,7 @@ H.plotZi();
 
 fprintf('\n\n\n\n\n\n\n\n--------------------------------- big full HMLMDP + decomp ----------------------------------\n\n\n\n\n\n\n');
 
+close all;
 map = [
     '.X...#.....';
     '.....#.....';

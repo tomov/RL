@@ -47,9 +47,9 @@ classdef HMLMDP < handle
         R_nongoal = -Inf; % the rewards at the other boundary states for the task; not to be confused with R_B_nongoal
         R_St = -1; % reward for St states to encourage entering them every now and then; determines at(:,:); too high -> keeps entering St state; too low -> never enters St state... TODO
 
-        alpha = 0.1; % how often agent transitions to higher layer; used for full HMLMDP with non-negative matrix factorization (Earle et al 2017) TODO dedupe with ALMDP.P_I_to_St
+        alpha = 0.05; % how often agent transitions to higher layer; used for full HMLMDP with non-negative matrix factorization (Earle et al 2017) TODO dedupe with ALMDP.P_I_to_St
 
-        rt_coef = 100; % coefficient by which to scale rt when recomputing weights on current level based on higher-level solution
+        rt_coef = 100; % coefficient by which to scale rt when recomputing weights on current level based on higher-level solution; for big HMLMDP's, must be large, on the order of the size of the grid -- since the difference in a(.|s) - P(.|s) is on the order of 1, and we want to push the agent away from negative St's (far from the reward) to positive St's (closer to it), however if it's reward is e.g. -40 and the goal state is 10 but it's 70 squares away (each with -1), it will prefer to go back to the St state
         rb_next_level_coef = 10; % coefficient by which to scale rb_next_level
     end
 
@@ -169,7 +169,6 @@ classdef HMLMDP < handle
 
                         % Fix Pt to reflect the uncovered basis tasks D
                         %
-                        save shit.mat;
                         M.P(M.St, M.I) = Pt';
                         % re-normalize
                         M.P = M.P ./ sum(M.P, 1);
@@ -305,7 +304,7 @@ classdef HMLMDP < handle
             state.done = false;
             state.s_next_level = [];
             state.rb_next_level = zeros(numel(self.M.St), 1);
-            state.rt = zeros(numel(self.M.St), 1);
+            state.rt = state.rb(ismember(self.M.B, self.M.St));
         end
 
         % step through a sample path in the HMLMDP
@@ -333,14 +332,23 @@ classdef HMLMDP < handle
 
                 % solve next level MLMDP
                 %
-                %rb_next_level = self.next.Ptb' * rb(~ismember(self.M.B, self.M.St)); % Andrew's suggestion
-                %rb_next_level = rb_next_level * self.rb_next_level_coef;
 
+                % andrew's suggestion for computing rb_next_level
+                % doesn't work well with -Inf's though... but non--Inf's don't make much sense
+                %{
+                assert(~isinf(HMLMDP.R_nongoal)); % andrew's suggestion doesn't work with inf's
+                rb_next_level = self.next.Ptb' * state.rb(~ismember(self.M.B, self.M.St)); % Andrew's suggestion
+                rb_next_level = rb_next_level * self.rb_next_level_coef;
+                %}
+
+                % my chicanery
+                assert(isinf(HMLMDP.R_nongoal));
                 w = self.M.w;
                 w(ismember(self.M.B, self.M.St)) = 0;
                 zi = self.M.Zi * w;
                 %rb_next_level = log(zi(self.M.St2I(self.M.St))) * LMDP.lambda;
                 rb_next_level = log(Pt * zi) * LMDP.lambda;
+
                 state.rb_next_level = rb_next_level;
 
                 %rb_next_level = [4 -1]';
@@ -351,6 +359,7 @@ classdef HMLMDP < handle
 
                 % sample until a boundary state
                 %
+                save shit.mat;
                 [~, path] = self.next.M.sample(s_next_level); % not really necessary here
 
                 % recalculate reward structure on current level
@@ -359,7 +368,7 @@ classdef HMLMDP < handle
                 ai = self.next.M.a(self.next.M.I, :);
                 Pi = self.next.M.P(self.next.M.I, :);
                 rt = (ai(:, s_next_level) - Pi(:, s_next_level)) * self.rt_coef; % Eq 10 from Saxe et al (2017)
-                state.rt = rt;
+                %state.rt = rt;
 
                 assert(size(rt, 1) == numel(self.M.St));
                 assert(size(rt, 2) == 1);
@@ -403,30 +412,55 @@ classdef HMLMDP < handle
 			self.map_gui = figure;
             self.Zi_gui = figure;
             self.plot_gui();
+
 			step_button = uicontrol('Style', 'pushbutton', 'String', 'Step', ...
-									 'Position', [100 10 70 20], ...
+									 'Position', [10 10 70 20], ...
 									 'Callback', @self.step_gui_callback);
         end
 
+        % plot state of sample in the GUI
+        %
         function plot_gui(self)
             figure(self.map_gui);
 
+            % plot map and current desirability f'n
+            %
+            subplot(1, 2, 1);
             zi = self.M.z(self.M.I);
-            imagesc(reshape(zi, size(self.M.map)));
+            imagesc(log(reshape(zi, size(self.M.map))));
             [x, y] = ind2sub(size(self.M.map), self.state_gui.s);
-            text(y, x, 'X', 'FontSize', 30, 'FontWeight', 'bold');
+            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
             if self.state_gui.done
-                title(sprintf('FINISHED Total reward: %.2f', self.state_gui.Rtot));
+                xlabel(sprintf('FINISHED Total reward: %.2f', self.state_gui.Rtot));
             else
-                title(sprintf('Total reward: %.2f', self.state_gui.Rtot));
+                xlabel(sprintf('Total reward: %.2f', self.state_gui.Rtot));
             end
+            title('Desirability function z_i^1');
 
+            %
+            %
+            subplot(1, 2, 2);
+            wb = self.M.w(~ismember(self.M.B, self.M.St));
+            if numel(wb) < numel(self.M.I)
+                w = zeros(numel(self.M.I), 1);
+                w(self.M.I2B > 0) = wb;
+                wb = w;
+            end
+            imagesc(reshape(wb, size(self.M.map)));
+            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
+            title('Boundary state weights w_b^1');
+
+            % plot desirability f'n of basis tasks 
+            %
             figure(self.Zi_gui);
             self.plotZi();
 
+            % back to map gui
             figure(self.map_gui);
         end
 
+        % step thru sample with GUI
+        %
         function step_gui_callback(self, hObject, eventdata, handles)
             if self.state_gui.done
                 return
@@ -458,20 +492,32 @@ classdef HMLMDP < handle
 
         end
 
-		% Plot the subtask desirability f'ns; only works for full HMLMDP's
+		% Plot the subtask desirability f'ns
 		%
         function plotZi(self)
             St_in_B = find(ismember(self.M.B, self.M.St));
+            if numel(self.M.St) == numel(self.M.I)
+                n = size(self.M.map, 1);
+                m = size(self.M.map, 2);
+            else
+                n = ceil(sqrt(numel(self.M.St)));
+                m = ceil(sqrt(numel(self.M.St)));
+            end
+
 			for s = 1:numel(self.M.St)
 				zi = self.M.Zi(:, St_in_B(s));
 				
 				[x, y] = ind2sub(size(self.M.map), s);
-				ind = sub2ind([size(self.M.map, 2) size(self.M.map, 1)], y, x);
-				subplot(size(self.M.map, 1), size(self.M.map, 2), ind);
-				imagesc(reshape(zi, size(self.M.map)));
+                if numel(self.M.St) == numel(self.M.I)
+                    ind = sub2ind([size(self.M.map, 2) size(self.M.map, 1)], y, x);
+                else
+                    ind = s;
+                end
+				subplot(n, m, ind);
+				imagesc(log(reshape(zi, size(self.M.map))));
 
                 if ~isempty(self.state_gui)
-                    xlabel(sprintf('rb = %.2f, rt = %.2f', self.state_gui.rb_next_level(s), self.state_gui.rt(s)));
+                    xlabel(sprintf('r_b^2 = %.2f, r_t^1 = %.2f, w_t^1 = %.2f', self.state_gui.rb_next_level(s), self.state_gui.rt(s), self.M.w(St_in_B(s))));
                 end
 			end
         end

@@ -61,8 +61,10 @@ classdef HMLMDP
     methods 
         function self = HMLMDP(arg)
             if isa(arg, 'HMLMDP')
+                %
                 % We're at the next level of the hierarchy
                 %
+
                 M1 = arg.M; 
                 assert(isa(M1, 'AMLMDP'));
 
@@ -107,8 +109,10 @@ classdef HMLMDP
 
                 self.M = M;
             else
+                %
                 % We're at the lowest level of the hierarchy
                 %
+
                 map = arg;
                 assert(ischar(map));
 
@@ -119,6 +123,7 @@ classdef HMLMDP
                 self.next = HMLMDP(self);
             end
         end
+
 
         function solve(self, goal)
             % Pre-solve all MLMDP's of the hierarchy

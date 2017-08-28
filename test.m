@@ -95,6 +95,8 @@ self = H; % for debugging
 
 
 
+
+
 %% TD(0) learning
 %
 
@@ -114,9 +116,12 @@ T = TD([
 %    T.sampleQ();
 %end
 
-for i = 1:20
-    T.sampleAC();
-end
+%for i = 1:20
+%    T.sampleAC();
+%end
+
+T.solveGPI();
+T.sampleGPI();
 
 %% Options framework
 %
@@ -126,7 +131,7 @@ fprintf('\n\n\n\n\n\n\n\n--------------------------------- Options -------------
 map = [
     '$####';
     'S#X..';
-    '-.S.-'];
-H = HMLMDP(map);
-H.solve();
+    '0.S.0'];
+O = Options(map);
+O.sampleQ();
 

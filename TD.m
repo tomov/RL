@@ -1,4 +1,5 @@
 % TD-learning (SARSA, Q-learning, and actor-critic) as in Sutton & Barto (2013)
+% For 'rooms' domain only
 % TODO dedupe with LMDP
 %
 classdef TD < handle
@@ -6,11 +7,11 @@ classdef TD < handle
     properties (Constant = true)
         % General
         % 
-        R_I = -1; % penalty for staying in one place
-        alpha = 0.1; % learning rate
-        gamma = 1; % discount rate
+        R_I = 0; % penalty for staying in one place
+        alpha = 0.5; % learning rate
+        gamma = 0.9; % discount rate
         eps = 0.1; % eps for eps-greedy
-        beta = 0.1; % learning rate for policy (actor-critic)
+        beta = 0.5; % learning rate for policy (actor-critic)
         GPI_threshold = 0.1; % threshold for convergence of V(s) during policy evaluation
 
         % Maze
@@ -99,7 +100,7 @@ classdef TD < handle
             for x = 1:size(map, 1)
                 for y = 1:size(map, 2)
                     s = self.pos2I(x, y);
-                    fprintf('(%d, %d) --> %d = ''%c''\n', x, y, s, map(x, y));
+                    %fprintf('(%d, %d) --> %d = ''%c''\n', x, y, s, map(x, y));
                     assert(ismember(s, S));
                     assert(ismember(s, I));
                     
@@ -125,7 +126,7 @@ classdef TD < handle
                         end
                         
                         new_s = self.pos2I(new_x, new_y);
-                        fprintf('      (%d, %d) --(%d)--> %d = ''%c''\n', new_x, new_y, a, new_s, map(new_x, new_y));
+                        %fprintf('      (%d, %d) --(%d)--> %d = ''%c''\n', new_x, new_y, a, new_s, map(new_x, new_y));
                         assert(ismember(new_s, S));
                         assert(ismember(new_s, I));
                             
@@ -182,42 +183,107 @@ classdef TD < handle
 
         % Solve using generalized policy iteration.
         % Notice that the resulting policy is deterministic
+        % TODO FIXME if you have negative internal rewards,
+        % it's never going to terminate your initial random policy doesn't access any terminal states => the V's will keep getting more and more negative forever...
+        % ALSO you need to have a discount factor < 1, otherwise
+        % it gets all screwed up -- first the closest-to-B state picks the right action but then once its neighbors have the same value as the goal state, it starts going to them instead...
         %
         function solveGPI(self)
             N = numel(self.S);
-            pi = randint(numel(self.A), [N 1]);
+            pi = randi(numel(self.A), [N 1]);
+
+            self.V(self.B) = self.R(self.B); % boundary V(s) = R(s)
+
+            assert(min(self.R(self.I)) >= 0); % doesn't work with negative internal rewards -> V(s)'s keep going towards -infinity forever
+            assert(self.gamma < 1); % doesn't work with gamma = 1 -> the states start going around in circles after a few iterations
 
             policy_stable = false;
+            iter = 0;
             while ~policy_stable
                 % policy evaluation
                 %
                 delta = Inf;
                 while delta > self.GPI_threshold
                     delta = 0;
-                    for s = self.S
+                    %fprintf('\n');
+                    for s = self.I
                         v = self.V(s);
                         a = pi(s);
-                        self.V(s) = sum(self.P(:, s, a) .* (self.R(:) + self.gamma * self.V(:)));
-                        delta = max(delta, v - self.V(s));
+                        self.V(s) = sum(self.P(:, s, a) .* (self.R(s) + self.gamma * self.V(:)));
+                        delta = max(delta, abs(v - self.V(s)));
+                        %fprintf('%d: %.2f -> %.2f (action %d), delta %.2f\n', s, v, self.V(s), a, delta);
                     end
                 end
+                %disp(self.V');
 
                 % policy improvement
                 %
                 policy_stable = true;
-                for s = self.S
-                    old_a = pi(s);
-                    [~, pi(s)] = max();
+                for s = self.I
+                    a = pi(s);
+                    r = squeeze(sum(self.P(:, s, :) .* (self.R(s) + self.gamma * self.V(:)), 1));
+                    %fprintf('  -- %d: %s\n', s, sprintf('%d ', r));
+                    assert(numel(r) == numel(self.A));
+                    [~, pi(s)] = max(r);
+                    if pi(s) ~= a
+                        policy_stable = false;
+                    end
                 end
+                %disp(pi');
             end
 
             self.pi = pi;
         end
 
         % Sample paths from deterministic policy pi generated using generalized policy iteration
+        % TODO dedupe with sampleEverything...
         %
-        function [Rtot, path] = sampleGPI(self, s)
-            f
+        function [Rtot, path] = sampleGPI(self, s, do_print)
+            if ~exist('s', 'var')
+                s = find(self.map == self.agent_symbol);
+            end
+            if ~exist('do_print', 'var')
+                do_print = false;
+            end
+            assert(numel(find(self.I == s)) == 1);
+
+            Rtot = 0;
+            path = [];
+
+            map = self.map;
+            if do_print, disp(map); end
+            while true
+                Rtot = Rtot + self.R(s);
+                path = [path, s];
+
+                [x, y] = self.I2pos(s);
+                
+                a = self.pi(s);
+                new_s = samplePF(self.P(:,s,a));
+
+                if ismember(new_s, self.B)
+                    % Boundary state
+                    %
+                    if do_print, fprintf('(%d, %d), %d --> END [%.2f%%]\n', x, y, a, self.P(new_s, s, a) * 100); end
+
+                    Rtot = Rtot + self.R(new_s);
+                    path = [path, new_s];
+                    break;
+                end
+
+                % Internal state
+                %
+                [new_x, new_y] = self.I2pos(new_s);
+                
+                map(x, y) = self.empty_symbol;
+                map(new_x, new_y) = self.agent_symbol;
+                
+                if do_print, fprintf('(%d, %d), %d --> (%d, %d) [%.2f%%]\n', x, y, a, new_x, new_y, self.P(new_s, s, a) * 100); end
+                if do_print, disp(map); end
+                
+                s = new_s;
+            end
+            if do_print, fprintf('Total reward: %d\n', Rtot); end
         end
 
         % Run an episode and update Q-values using SARSA
@@ -252,7 +318,7 @@ classdef TD < handle
                 if ismember(new_s, self.B)
                     % Boundary state
                     %
-                fprintf('(%d, %d), %d --> END [%.2f%%], old Q = %.2f, pe = %.2f, Q = %.2f\n', x, y, a, self.P(new_s, s, a) * 100, oldQ, pe, self.Q(s, a));
+                    fprintf('(%d, %d), %d --> END [%.2f%%], old Q = %.2f, pe = %.2f, Q = %.2f\n', x, y, a, self.P(new_s, s, a) * 100, oldQ, pe, self.Q(s, a));
 
                     Rtot = Rtot + self.R(new_s);
                     path = [path, new_s];
@@ -305,7 +371,7 @@ classdef TD < handle
                 if ismember(new_s, self.B)
                     % Boundary state
                     %
-                fprintf('(%d, %d), %d --> END [%.2f%%], old Q = %.2f, pe = %.2f, Q = %.2f\n', x, y, a, self.P(new_s, s, a) * 100, oldQ, pe, self.Q(s, a));
+                    fprintf('(%d, %d), %d --> END [%.2f%%], old Q = %.2f, pe = %.2f, Q = %.2f\n', x, y, a, self.P(new_s, s, a) * 100, oldQ, pe, self.Q(s, a));
 
                     Rtot = Rtot + self.R(new_s);
                     path = [path, new_s];

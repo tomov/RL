@@ -154,7 +154,7 @@ map = [
     '..#..#.....';
     '........#..';
     '.....#..$..'];
-H = HMLMDP(map, true, 5);
+H = HMLMDP(map, true, 6);
 %H.sample();
 H.sample_gui();
 

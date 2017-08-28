@@ -384,7 +384,7 @@ classdef HMLMDP < handle
                 % new reward structure
                 %
                 w = self.M.solveMLMDP(state.rb);
-                fprintf('                     w = [%s]\n', sprintf('%.3f, ', w));
+                fprintf('                    wt = [%s]\n', sprintf('%.3f, ', w(ismember(self.M.B, self.M.St))));
                 fprintf('                new zi = [%s]\n', sprintf('%.3f, ', self.M.z(self.M.I)'));
                 fprintf('                new zb = [%s]\n', sprintf('%.3f, ', self.M.z(self.M.B)'));
                 a_I_to_St = max(self.M.a(self.M.St,:), [], 2)';

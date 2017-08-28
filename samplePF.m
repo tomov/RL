@@ -1,7 +1,7 @@
 function i = samplePF(PF)
     % sample from a discrete probability distribution
-    % using the universality of the normal
-    % i.e. F^-1(x) ~ Unif(0, 1)
+    % using the universality of the uniform
+    % i.e. F(x) ~ Unif(0, 1)
     %
     CDF = cumsum(PF);
     r = rand(1);

@@ -47,6 +47,8 @@ classdef HMLMDP
         R_nongoal = -Inf; % the rewards at the other boundary states for the task; not to be confused with R_B_nongoal
         R_St = -1; % reward for St states to encourage entering them every now and then; determines at(:,:); too high -> keeps entering St state; too low -> never enters St state... TODO
 
+        alpha = 0.1; % how often agent transitions to higher layer; used for full HMLMDP with non-negative matrix factorization (Earle et al 2017)
+
         rt_coef = 100; % coefficient by which to scale rt when recomputing weights on current level based on higher-level solution
         rb_next_level_coef = 10; % coefficient by which to scale rb_next_level
     end
@@ -276,10 +278,45 @@ classdef HMLMDP
                 end
 
                 iter = iter + 1;
-                if iter >= 30, break; end
+                if iter >= 40, break; end
             end
 
             fprintf('Total reward: %d\n', Rtot);
+        end
+
+		% Plot the subtask desirability f'ns; only works for full HMLMDP's TODO make better
+		%
+        function plotZi(self)
+			assert(numel(self.M.I) == numel(self.M.St)); % only for full
+
+			figure;
+            St_in_B = find(ismember(self.M.B, self.M.St));
+			for s = 1:numel(self.M.I)
+				zi = self.M.Zi(:, St_in_B(s));
+				
+				[x, y] = ind2sub(size(self.M.map), s);
+				ind = sub2ind([size(self.M.map, 2) size(self.M.map, 1)], y, x);
+				subplot(size(self.M.map, 1), size(self.M.map, 2), ind);
+				imagesc(reshape(zi, size(self.M.map)));
+			end
+        end
+
+		% Plot the subtasks after non-negative matrix factorization; only works for full HMLMDP's TODO make better
+		%
+        function plotD(self, k)
+			assert(numel(self.M.I) == numel(self.M.St));
+
+			figure;
+            St_in_B = find(ismember(self.M.B, self.M.St));
+	        Zi = self.M.Zi(:, St_in_B);
+            [D, W] = nnmf(Zi, k);
+
+			for s = 1:k
+				di = D(:,s);
+				
+				subplot(1, k, s);
+				imagesc(reshape(di, size(self.M.map)));
+			end
         end
     end
 

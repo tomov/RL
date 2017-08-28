@@ -151,5 +151,6 @@ classdef MLMDP < LMDP
             assert(size(self.qi, 2) == 1);
             assert(isempty(self.q));
         end
+
     end
 end

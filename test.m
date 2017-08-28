@@ -84,6 +84,7 @@ map = [
 H = HMLMDP(map, true);
 H.solve();
 
+H.plotZi();
 
 
 %% Big HMLMDP
@@ -130,8 +131,9 @@ map = [
 H = HMLMDP(map, true);
 H.solve();
 
-self = H; % for debugging
+H.plotZi();
 
+self = H; % for debugging
 
 
 

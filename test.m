@@ -179,12 +179,12 @@ T = TD([
 %    T.sampleQ(find(map == 'X'), true);
 %end
 
-for i = 1:20
-    T.sampleAC(find(map == 'X'), true);
-end
+%for i = 1:20
+%    T.sampleAC(find(map == 'X'), true);
+%end
 
-%T.solveGPI();
-%T.sampleGPI();
+T.solveGPI();
+T.sampleGPI_gui();
 
 %% Options framework
 %

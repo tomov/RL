@@ -436,7 +436,7 @@ classdef HMLMDP < handle
             end
             title('Desirability function z_i^1');
 
-            %
+            % plot the weights of the boundary state tasks
             %
             subplot(1, 2, 2);
             wb = self.M.w(~ismember(self.M.B, self.M.St));
@@ -465,11 +465,11 @@ classdef HMLMDP < handle
                 return
             end
 
-            disp(self.state_gui.s);
             [x, y] = self.M.I2pos(self.state_gui.s);
             old_s = self.state_gui.s;
                
             self.state_gui = self.step(self.state_gui);
+            disp(self.state_gui.s);
             self.plot_gui();
 
             map = self.M.map;

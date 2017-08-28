@@ -39,6 +39,11 @@ classdef TD < handle
         % Maze stuff
         %
         map = [];
+
+        % GUI
+        %
+        state_gui = []; % state for the GUI step-through
+        map_gui = []; % figure for the GUI
     end
    
     methods
@@ -231,6 +236,11 @@ classdef TD < handle
         % Sample paths from deterministic policy pi generated using generalized policy iteration
         %
 
+        function sampleGPI_gui(varargin)
+            self = varargin{1};
+            self.sample_gui_helper(@self.init_sampleGPI, @self.stepGPI, varargin{2:end});
+        end
+
         function res = sampleGPI(varargin)
             self = varargin{1};
             res = self.sample_helper(@self.init_sampleGPI, @self.stepGPI, varargin{2:end});
@@ -262,10 +272,12 @@ classdef TD < handle
                 state.Rtot = state.Rtot + self.R(new_s);
                 state.path = [state.path, new_s];
                 state.done = true;
+            else
+                % Internal state
+                %
+                state.a = a;
+                state.s = new_s;
             end
-
-            state.a = a;
-            state.s = new_s;
         end
 
         %
@@ -286,7 +298,7 @@ classdef TD < handle
             state.Rtot = 0;
             state.path = [];
             state.s = s;
-            state.a = self.eps_greedy(s);
+            state.a = self.eps_greedy(s); % notice for SARSA, a is the action we took from state s, NOT the action that got us to state s (unlike for the others)
             state.done = false;
             state.r = 0;
             state.pe = 0;
@@ -312,12 +324,14 @@ classdef TD < handle
                 state.Rtot = state.Rtot + self.R(new_s);
                 state.path = [state.path, new_s];
                 state.done = true;
+            else
+                % Internal state
+                %
+                state.s = new_s;
+                state.a = new_a;
+                state.r = r;
+                state.pe = pe;
             end
-
-            state.s = new_s;
-            state.a = new_a;
-            state.r = r;
-            state.pe = pe;
         end
 
         %
@@ -363,12 +377,14 @@ classdef TD < handle
                 state.Rtot = state.Rtot + self.R(new_s);
                 state.path = [state.path, new_s];
                 state.done = true;
+            else
+                % Internal state
+                %
+                state.s = new_s;
+                state.a = new_a;
+                state.r = r;
+                state.pe = pe;
             end
-
-            state.s = new_s;
-            state.a = a;
-            state.r = r;
-            state.pe = pe;
         end
 
         %
@@ -415,12 +431,14 @@ classdef TD < handle
                 state.Rtot = state.Rtot + self.R(new_s);
                 state.path = [state.path, new_s];
                 state.done = true;
+            else
+                % Internal state
+                %
+                state.s = new_s;
+                state.a = new_a;
+                state.r = r;
+                state.pe = pe;
             end
-
-            state.s = new_s;
-            state.a = a;
-            state.r = r;
-            state.pe = pe;
         end
 
         % Generic function that samples paths given a state initializer and a step function
@@ -458,6 +476,54 @@ classdef TD < handle
 
             Rtot = state.Rtot;
             path = state.path;
+        end
+
+        %
+        % Generic function that samples paths using a nice GUI
+        %
+
+        function sample_gui_helper(self, init_fn, step_fn, s)
+            if ~exist('s', 'var')
+                self.state_gui = init_fn();
+            else
+                self.state_gui = init_fn(s);
+            end
+
+			self.map_gui = figure;
+            self.plot_gui();
+
+            step_callback = @(hObject, eventdata) self.step_gui_callback(step_fn, hObject, eventdata);
+
+			step_button = uicontrol('Style', 'pushbutton', 'String', 'Step', ...
+									 'Position', [10 10 70 20], ...
+									 'Callback', step_callback);
+        end
+
+        function step_gui_callback(self, step_fn, hObject, eventdata, handles)
+            if self.state_gui.done
+                return
+            end
+
+            self.state_gui = step_fn(self.state_gui);
+            self.plot_gui();
+        end
+
+        function plot_gui(self)
+            figure(self.map_gui);
+
+            % plot map and current value f'n
+            %
+            subplot(1, 2, 1);
+            vi = self.V(self.I);
+            imagesc(log(reshape(vi, size(self.map))));
+            [x, y] = ind2sub(size(self.map), self.state_gui.s);
+            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
+            if self.state_gui.done
+                xlabel(sprintf('FINISHED Total reward: %.2f', self.state_gui.Rtot));
+            else
+                xlabel(sprintf('Total reward: %.2f', self.state_gui.Rtot));
+            end
+            title('Value function V');
         end
 
         % Pick action a from state s using eps-greedy based on Q-values

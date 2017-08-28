@@ -56,7 +56,7 @@ map = [
     'S#X..';
     '0.S.0'];
 H = HMLMDP(map);
-H.solve();
+H.sample();
 
 
 %% Full HMLMDP
@@ -69,7 +69,7 @@ map = [
     '.#X..';
     '.....'];
 H = HMLMDP(map, true);
-H.solve();
+H.sample();
 
 H.plotZi();
 
@@ -84,7 +84,7 @@ map = [
     '.#X..';
     '.....'];
 H = HMLMDP(map, true, 2);
-H.solve();
+H.sample();
 
 H.plotZi();
 
@@ -107,7 +107,7 @@ map = [
     '.0S....S#..';
     '.....#..$..'];
 H = HMLMDP(map);
-H.solve();
+H.sample();
 
 %% Big full HMLMDP
 %
@@ -127,7 +127,7 @@ map = [
     '........#..';
     '.....#..$..'];
 H = HMLMDP(map, true);
-H.solve();
+H.sample();
 
 H.plotZi();
 
@@ -150,7 +150,7 @@ map = [
     '........#..';
     '.....#..$..'];
 H = HMLMDP(map, true, 5);
-H.solve();
+H.sample();
 
 H.plotZi();
 

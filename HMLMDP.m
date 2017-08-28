@@ -217,14 +217,61 @@ classdef HMLMDP
         end
 
 
-        function solve(self, goal)
-            % Some helper variables
-            %
-            Pt = self.M.P(self.M.St, self.M.I);
+        % Sample a path through the HMLMDP
+        %
+        function [Rtot, path] = sample(self, s)
 
+            if ~exist('s', 'var')
+                state = self.init_sample();
+            else
+                state = self.init_sample(s);
+            end
+
+            map = self.M.map;
+            disp(map)
+
+            iter = 1;
+            while ~state.done
+                [x, y] = self.M.I2pos(state.s);
+                old_s = state.s;
+               
+                state = self.step(state);
+
+                if ismember(state.s, self.M.I)
+                    % Internal state -> just move to it
+                    %
+                    [new_x, new_y] = self.M.I2pos(state.s);
+                    map(x, y) = LMDP.empty_symbol;
+                    map(new_x, new_y) = LMDP.agent_symbol;
+                    fprintf('(%d, %d) --> (%d, %d) [%.2f%%]\n', x, y, state.s, new_y, self.M.a(state.s,old_s) * 100);
+                    disp(map);
+
+                elseif ismember(new_s, self.M.St)
+                    % Higher layer state i.e. subtask state
+                    %
+                    fprintf(' ... BACK FROM NEXT LEVEL! (%d, %d) --> %d [%.2f%%] !!!\n', x, y, state.s_next_level, self.M.a(new_s, s) * 100);
+                else
+                    fprintf('(%d, %d) --> END [%.2f%%]\n', x, y, self.M.a(state.s, old_s) * 100);
+                end
+
+                iter = iter + 1;
+                if iter >= 40, break; end
+            end
+
+            fprintf('Total reward: %d\n', state.Rtot);
+
+            Rtot = state.Rtot;
+            path = state.path;
+        end
+
+        % Initialize a sampler through the HMLMDP
+        %
+        function state = init_sample(self, s)
             % Find starting state
             %
-            s = find(self.M.map == LMDP.agent_symbol);
+            if ~exist('s', 'var')
+                s = find(self.M.map == LMDP.agent_symbol);
+            end
 
             % Find goal state(s)
             %
@@ -235,9 +282,9 @@ classdef HMLMDP
 
             % Set up reward structure according to goal state(s)
             %
-            rb = HMLMDP.R_nongoal * ones(numel(self.M.B), 1); % non-goal B states have q = 0
-            rb(find(self.M.B == e)) = HMLMDP.R_goal; % goal B states have an actual reward
-            rb(ismember(self.M.B, self.M.St)) = HMLMDP.R_St; % St states have a small reward to encourage exploring them every now and then
+            state.rb = HMLMDP.R_nongoal * ones(numel(self.M.B), 1); % non-goal B states have q = 0
+            state.rb(find(self.M.B == e)) = HMLMDP.R_goal; % goal B states have an actual reward
+            state.rb(ismember(self.M.B, self.M.St)) = HMLMDP.R_St; % St states have a small reward to encourage exploring them every now and then
 
             % Find solution on current level based on reward structure
             % Notice that if we do this directly using inversion, it makes the whole hierarchy a bit futile.
@@ -246,101 +293,96 @@ classdef HMLMDP
             % and the subtask states can reach each other => then she can jump from one subtask state
             % to another until she reaches the end.
             %
-            self.M.solveMLMDP(rb);
+            self.M.solveMLMDP(state.rb);
 
             % Solve the HMLMDP by sampling from multiple levels
-            % TODO dedupe with sample
             %
-            Rtot = 0;
-
-            map = self.M.map;
-            disp(map)
-
-            iter = 1;
-            while true
-                [x, y] = self.M.I2pos(s);
-                
-                new_s = samplePF(self.M.a(:,s));
-
-                if ismember(new_s, self.M.I)
-                    % Internal state -> just move to it
-                    %
-                    [new_x, new_y] = self.M.I2pos(new_s);
-                    map(x, y) = LMDP.empty_symbol;
-                    map(new_x, new_y) = LMDP.agent_symbol;
-                    fprintf('(%d, %d) --> (%d, %d) [%.2f%%]\n', x, y, new_x, new_y, self.M.a(new_s,s) * 100);
-                    disp(map);
-
-                    Rtot = Rtot + self.M.R(new_s);
-                    s = new_s;
-
-                elseif ismember(new_s, self.M.St)
-                    % Higher layer state i.e. subtask state
-                    %
-                    s_next_level = find(self.M.St == new_s); % St state on current level == I state on higher level
-
-                    fprintf('NEXT LEVEL BITCH! (%d, %d) --> %d [%.2f%%] !!!\n', x, y, s_next_level, self.M.a(new_s, s) * 100);
-
-                    % solve next level MLMDP
-                    %
-                    %rb_next_level = self.next.Ptb' * rb(~ismember(self.M.B, self.M.St)); % Andrew's suggestion
-                    %rb_next_level = rb_next_level * self.rb_next_level_coef;
-
-                    w = self.M.w;
-                    w(ismember(self.M.B, self.M.St)) = 0;
-                    zi = self.M.Zi * w;
-                    %rb_next_level = log(zi(self.M.St2I(self.M.St))) * LMDP.lambda;
-                    rb_next_level = log(Pt * zi) * LMDP.lambda;
-
-                    %rb_next_level = [4 -1]';
-
-                    fprintf('                rb_next_level = [%s]\n', sprintf('%.3f, ', rb_next_level));
-                    self.next.M.solveMLMDP(rb_next_level);
-
-                    % sample until a boundary state
-                    %
-                    [~, path] = self.next.M.sample(s_next_level); % not really necessary here
-
-                    % recalculate reward structure on current level
-                    % based on the optimal policy on the higher level
-                    %
-                    ai = self.next.M.a(self.next.M.I, :);
-                    Pi = self.next.M.P(self.next.M.I, :);
-                    rt = (ai(:, s_next_level) - Pi(:, s_next_level)) * self.rt_coef; % Eq 10 from Saxe et al (2017)
-                    assert(size(rt, 1) == numel(self.M.St));
-                    assert(size(rt, 2) == 1);
-                    fprintf('               ai(:,s) = [%s]\n', sprintf('%.3f, ', ai(:, s_next_level)));
-                    fprintf('               Pi(:,s) = [%s]\n', sprintf('%.3f, ', Pi(:, s_next_level)));
-                    fprintf('               ai - Pi = [%s]\n', sprintf('%.3f, ', rt / self.rt_coef));
-                    fprintf('                    rt = [%s]\n', sprintf('%.3f, ', rt));
-                    fprintf('                old rb = [%s]\n', sprintf('%.3f, ', rb));
-                    rb(ismember(self.M.B, self.M.St)) = rt;
-                    fprintf('                new rb = [%s]\n', sprintf('%.3f, ', rb));
-
-                    % recompute the optimal policy based on the 
-                    % new reward structure
-                    %
-                    w = self.M.solveMLMDP(rb);
-                    fprintf('                     w = [%s]\n', sprintf('%.3f, ', w));
-                    fprintf('                new zi = [%s]\n', sprintf('%.3f, ', self.M.z(self.M.I)'));
-                    fprintf('                new zb = [%s]\n', sprintf('%.3f, ', self.M.z(self.M.B)'));
-                    a_I_to_St = max(self.M.a(self.M.St,:), [], 2)';
-                    fprintf('               a(St|I) = [%s]\n', sprintf('%.3f, ', a_I_to_St));
-
-                    fprintf('....END NEXT LEVEL %d --> (%d, %d)!!!\n', s_next_level, x, y);
-                else
-                    fprintf('(%d, %d) --> END [%.2f%%]\n', x, y, self.M.a(new_s, s) * 100);
-
-                    Rtot = Rtot + self.M.R(new_s);
-                    break
-                end
-
-                iter = iter + 1;
-                if iter >= 40, break; end
-            end
-
-            fprintf('Total reward: %d\n', Rtot);
+            state.Rtot = 0;
+            state.path = [];
+            state.s = s;
+            state.done = false;
+            state.s_next_level = [];
         end
+
+        % step through a sample path in the HMLMDP
+        %
+        function state = step(self, state)
+            % Some helper variables
+            %
+            Pt = self.M.P(self.M.St, self.M.I);
+
+            new_s = samplePF(self.M.a(:,state.s));
+
+            if ismember(new_s, self.M.I)
+                % Internal state -> just move to it
+                %
+                state.Rtot = state.Rtot + self.M.R(new_s);
+                state.path =[state.path, new_s];
+                state.s = new_s;
+
+            elseif ismember(new_s, self.M.St)
+                % Higher layer state i.e. subtask state
+                %
+                s_next_level = find(self.M.St == new_s); % St state on current level == I state on higher level
+
+                state.s_next_level = s_next_level;
+
+                % solve next level MLMDP
+                %
+                %rb_next_level = self.next.Ptb' * rb(~ismember(self.M.B, self.M.St)); % Andrew's suggestion
+                %rb_next_level = rb_next_level * self.rb_next_level_coef;
+
+                w = self.M.w;
+                w(ismember(self.M.B, self.M.St)) = 0;
+                zi = self.M.Zi * w;
+                %rb_next_level = log(zi(self.M.St2I(self.M.St))) * LMDP.lambda;
+                rb_next_level = log(Pt * zi) * LMDP.lambda;
+
+                %rb_next_level = [4 -1]';
+
+                fprintf('                rb_next_level = [%s]\n', sprintf('%.3f, ', rb_next_level));
+                self.next.M.solveMLMDP(rb_next_level);
+
+                % sample until a boundary state
+                %
+                [~, path] = self.next.M.sample(s_next_level); % not really necessary here
+
+                % recalculate reward structure on current level
+                % based on the optimal policy on the higher level
+                %
+                ai = self.next.M.a(self.next.M.I, :);
+                Pi = self.next.M.P(self.next.M.I, :);
+                rt = (ai(:, s_next_level) - Pi(:, s_next_level)) * self.rt_coef; % Eq 10 from Saxe et al (2017)
+                assert(size(rt, 1) == numel(self.M.St));
+                assert(size(rt, 2) == 1);
+                fprintf('               ai(:,s) = [%s]\n', sprintf('%.3f, ', ai(:, s_next_level)));
+                fprintf('               Pi(:,s) = [%s]\n', sprintf('%.3f, ', Pi(:, s_next_level)));
+                fprintf('               ai - Pi = [%s]\n', sprintf('%.3f, ', rt / self.rt_coef));
+                fprintf('                    rt = [%s]\n', sprintf('%.3f, ', rt));
+                fprintf('                old rb = [%s]\n', sprintf('%.3f, ', state.rb));
+                state.rb(ismember(self.M.B, self.M.St)) = rt;
+                fprintf('                new rb = [%s]\n', sprintf('%.3f, ', state.rb));
+
+                % recompute the optimal policy based on the 
+                % new reward structure
+                %
+                w = self.M.solveMLMDP(state.rb);
+                fprintf('                     w = [%s]\n', sprintf('%.3f, ', w));
+                fprintf('                new zi = [%s]\n', sprintf('%.3f, ', self.M.z(self.M.I)'));
+                fprintf('                new zb = [%s]\n', sprintf('%.3f, ', self.M.z(self.M.B)'));
+                a_I_to_St = max(self.M.a(self.M.St,:), [], 2)';
+                fprintf('               a(St|I) = [%s]\n', sprintf('%.3f, ', a_I_to_St));
+
+            else
+                % regular ol' boundary state
+                %
+
+                state.Rtot = state.Rtot + self.M.R(new_s);
+                state.path = [state.path, new_s];
+                state.done = true;
+            end
+        end
+
 
 		% Plot the subtask desirability f'ns; only works for full HMLMDP's
 		%

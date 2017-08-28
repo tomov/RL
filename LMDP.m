@@ -278,6 +278,9 @@ classdef LMDP < handle
                 end
             end
             fprintf('Total reward: %d\n', state.Rtot);
+
+            Rtot = state.Rtot;
+            path = state.path;
         end
 
 

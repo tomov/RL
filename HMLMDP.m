@@ -47,7 +47,7 @@ classdef HMLMDP
         R_nongoal = -Inf; % the rewards at the other boundary states for the task; not to be confused with R_B_nongoal
         R_St = -1; % reward for St states to encourage entering them every now and then; determines at(:,:); too high -> keeps entering St state; too low -> never enters St state... TODO
 
-        alpha = 0.1; % how often agent transitions to higher layer; used for full HMLMDP with non-negative matrix factorization (Earle et al 2017)
+        alpha = 0.1; % how often agent transitions to higher layer; used for full HMLMDP with non-negative matrix factorization (Earle et al 2017) TODO dedupe with ALMDP.P_I_to_St
 
         rt_coef = 100; % coefficient by which to scale rt when recomputing weights on current level based on higher-level solution
         rb_next_level_coef = 10; % coefficient by which to scale rb_next_level
@@ -61,7 +61,7 @@ classdef HMLMDP
     end
 
     methods 
-        function self = HMLMDP(arg, full)
+        function self = HMLMDP(arg, full, k)
             if ~exist('full', 'var')
                 full = false; % whether to have S and B state for every I state, or to use the map
             end
@@ -118,6 +118,9 @@ classdef HMLMDP
                 self.Ptb = Ptb;
 
                 self.M = M;
+
+                % Presolve it -> generate desirability basis matrix Z
+                self.M.presolve();
             else
                 %
                 % We're at the lowest level of the hierarchy
@@ -127,39 +130,94 @@ classdef HMLMDP
                 assert(ischar(map));
 
                 if full
-                    % each I state has a corresponding B state and St state
+                    %
+                    % the 'full' case.
+                    % Each I state has a corresponding B state and St state.
+                    % Optionally perform non-negative matrix factorization as in Earle et al (2017)
+                    % to find a suitable basis set of tasks and shrink the number of St states
                     %
                     subtask_inds = 1:numel(map);
                     absorbing_inds = 1:numel(map);
                     assert(isempty(find(map == HMLMDP.subtask_symbol))); % in this case, do not supply S states, just pass a regular ol' map
+
+                    if exist('k', 'var')
+                        % We supplied k => perform non-negative matrix factorization to fin
+                        % a suitable basis set of tasks.
+                        % that's the interesting case
+                        %
+
+                        % Create regular MLMDP to find the basis matrix Z for the bundary states
+                        M = MLMDP(map, absorbing_inds);
+
+                        % Presolve it -> generate desirability basis matrix Z
+                        M.presolve();
+
+                        % find a basis set of tasks using nonnegative matrix factorization (Earle et al 2017)
+                        %
+                        Zi = M.Zi;
+                        [D, W] = nnmf(Zi, k); % Eq. 1 from Earle et al (2017)
+
+                        Pt = self.alpha * (D / max(D(:))); % scale D to [0, 1] to get Pt
+
+                        % Create an augmented MLMDP and 'tweak' it to use the uncovered basis tasks
+                        %
+                        M = AMLMDP(map, 1:k, absorbing_inds); % pass fake subtask_inds; we fix stuff later
+
+                        % Fix Pt to reflect the uncovered basis tasks D
+                        %
+                        save shit.mat;
+                        M.P(M.St, M.I) = Pt';
+                        % re-normalize
+                        M.P = M.P ./ sum(M.P, 1);
+                        M.P(isnan(M.P)) = 0;
+                        assert(sum(abs(sum(M.P, 1) - 1) < 1e-8 | abs(sum(M.P, 1)) < 1e-8) == numel(M.S));
+
+                        % Pre-solve augmented MLMDP with the basis tasks TODO a bit redundant since already solved for non-St B states in first MLMDP
+                        %
+                        M.presolve();
+
+                        self.M = M;
+
+                        % Initialize next layer of the hierarchy
+                        self.next = HMLMDP(self);
+                    else
+                        % Each state has a corresponding St state. Pretty useless
+                        % TODO dedupe with non-full case
+                        %
+                        % Create augmented MLMDP
+                        self.M = AMLMDP(map, subtask_inds, absorbing_inds);
+                       
+                        % Presolve it -> generate desirability basis matrix Z
+                        self.M.presolve();
+
+                        % Initialize next layer of the hierarchy
+                        self.next = HMLMDP(self);
+                    end
+
                 else
+                    %
+                    % the old-fashioned, non-full case
                     % S = subtask (St) state, $ or number = boundary (B) state
                     %
                     subtask_inds = find(map == HMLMDP.subtask_symbol)';
                     absorbing_inds = []; % infer them from the map
                     map(subtask_inds) = LMDP.empty_symbol; % even though AMLMDP's are aware of subtask states, they don't want them in the map b/c they just pass it down to the MLMDP's which don't know what those are
+
+                    % Create augmented MLMDP
+                    self.M = AMLMDP(map, subtask_inds, absorbing_inds);
+                   
+                    % Presolve it -> generate desirability basis matrix Z
+                    self.M.presolve();
+
+                    % Initialize next layer of the hierarchy
+                    self.next = HMLMDP(self);
                 end
 
-                self.M = AMLMDP(map, subtask_inds, absorbing_inds);
-                self.next = HMLMDP(self);
             end
         end
 
 
         function solve(self, goal)
-            % Pre-solve all MLMDP's of the hierarchy
-            %
-            cur = self;
-            while ~isempty(cur.M)
-                cur.M.presolve();
-                if ~isempty(cur.next)
-                    assert(numel(cur.M.St) == numel(cur.next.M.I));
-                    cur = cur.next;
-                else
-                    break;
-                end
-            end
-
             % Some helper variables
             %
             Pt = self.M.P(self.M.St, self.M.I);
@@ -284,14 +342,12 @@ classdef HMLMDP
             fprintf('Total reward: %d\n', Rtot);
         end
 
-		% Plot the subtask desirability f'ns; only works for full HMLMDP's TODO make better
+		% Plot the subtask desirability f'ns; only works for full HMLMDP's
 		%
         function plotZi(self)
-			assert(numel(self.M.I) == numel(self.M.St)); % only for full
-
 			figure;
             St_in_B = find(ismember(self.M.B, self.M.St));
-			for s = 1:numel(self.M.I)
+			for s = 1:numel(self.M.St)
 				zi = self.M.Zi(:, St_in_B(s));
 				
 				[x, y] = ind2sub(size(self.M.map), s);

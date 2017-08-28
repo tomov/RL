@@ -59,19 +59,6 @@ H = HMLMDP(map);
 H.solve();
 
 
-
-%% HMLMDP
-%
-
-fprintf('\n\n\n\n\n\n\n\n--------------------------------- HMLMDP ----------------------------------\n\n\n\n\n\n\n');
-
-map = [
-    '$####';
-    'S#X..';
-    '0.S.0'];
-H = HMLMDP(map);
-H.solve();
-
 %% Full HMLMDP
 %
 
@@ -82,6 +69,21 @@ map = [
     '.#X..';
     '.....'];
 H = HMLMDP(map, true);
+H.solve();
+
+H.plotZi();
+
+
+%% Full HMLMDP + decomposed Zi
+%
+
+fprintf('\n\n\n\n\n\n\n\n--------------------------------- Full HMLMDP decomp ----------------------------------\n\n\n\n\n\n\n');
+
+map = [
+    '$####';
+    '.#X..';
+    '.....'];
+H = HMLMDP(map, true, 2);
 H.solve();
 
 H.plotZi();
@@ -107,10 +109,6 @@ map = [
 H = HMLMDP(map);
 H.solve();
 
-self = H; % for debugging
-
-
-
 %% Big full HMLMDP
 %
 
@@ -133,7 +131,28 @@ H.solve();
 
 H.plotZi();
 
-self = H; % for debugging
+
+%% Big full HMLMDP + decomposition of Zi
+%
+
+fprintf('\n\n\n\n\n\n\n\n--------------------------------- big full HMLMDP + decomp ----------------------------------\n\n\n\n\n\n\n');
+
+map = [
+    '.X...#.....';
+    '.....#.....';
+    '..#........';
+    '.#...#..##.';
+    '.....#.....';
+    '#.####.....';
+    '.....###.##';
+    '..#..#.....';
+    '..#..#.....';
+    '........#..';
+    '.....#..$..'];
+H = HMLMDP(map, true, 5);
+H.solve();
+
+H.plotZi();
 
 
 

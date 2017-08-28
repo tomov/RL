@@ -254,47 +254,70 @@ classdef LMDP < handle
         %
         function [Rtot, path] = sample(self, s)
             if ~exist('s', 'var')
+                state = self.init_sample();
+            else
+                state = self.init_sample(s);
+            end
+
+            map = self.map;
+            disp(map);
+            while ~state.done
+                [x, y] = self.I2pos(state.s);
+                old_s = state.s;
+
+                state = self.step(state);
+               
+                if state.done
+                    fprintf('(%d, %d) [%.2f%%] --> END\n', x, y, self.a(state.s, old_s) * 100);
+                else
+                    [new_x, new_y] = self.I2pos(state.s);
+                    map(x, y) = self.empty_symbol;
+                    map(new_x, new_y) = self.agent_symbol;
+                    fprintf('(%d, %d) --> (%d, %d) [%.2f%%]\n', x, y, new_x, new_y, self.a(state.s, old_s) * 100);
+                    disp(map);
+                end
+            end
+            fprintf('Total reward: %d\n', state.Rtot);
+        end
+
+
+        % Initialize a sampler to sample a path in the solved LMDP.
+        % Then run step() for iterate one step at a time
+        % TODO dedupe with sample()
+        %
+        function state = init_sample(self, s)
+            if ~exist('s', 'var')
                 s = find(self.map == self.agent_symbol);
             end
             assert(numel(find(self.I == s)) == 1);
 
-            Rtot = 0;
-            path = [];
-            
-            map = self.map;
-            disp(map);
-            while true
-                Rtot = Rtot + self.R(s);
-                path = [path, s];
-
-                [x, y] = self.I2pos(s);
-                
-                new_s = samplePF(self.a(:,s));        
-                
-                if ismember(new_s, self.B)
-                    % Boundary state
-                    %
-                    fprintf('(%d, %d) [%.2f%%] --> END\n', x, y, self.a(new_s, s) * 100);
-
-                    Rtot = Rtot + self.R(new_s);
-                    path = [path, new_s];
-                    break;
-                end
-
-                % Internal state
-                %
-                [new_x, new_y] = self.I2pos(new_s);
-                
-                map(x, y) = self.empty_symbol;
-                map(new_x, new_y) = self.agent_symbol;
-                
-                fprintf('(%d, %d) --> (%d, %d) [%.2f%%]\n', x, y, new_x, new_y, self.a(new_s, s) * 100);
-                disp(map);
-                
-                s = new_s;
-            end
-            fprintf('Total reward: %d\n', Rtot);
+            state.Rtot = 0;
+            state.path = [];
+            state.s = s;
+            state.done = false;
         end
+
+        % Step through a sample
+        %
+        function state = step(self, state)
+            state.Rtot = state.Rtot + self.R(state.s);
+            state.path = [state.path, state.s];
+
+            new_s = samplePF(self.a(:,state.s));        
+
+            if ismember(new_s, self.B)
+                % Boundary state
+                %
+                state.Rtot = state.Rtot + self.R(new_s);
+                state.path = [state.path, new_s];
+                state.done = true;
+            end
+
+            % Internal state
+            %
+            state.s = new_s;
+        end
+
 
         % Convert from maze position to internal state
         %

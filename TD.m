@@ -371,57 +371,56 @@ classdef TD < handle
             state.pe = pe;
         end
 
-        % Run an episode and update V-values and policy using actor-critic
-        % TODO dedupe with sampleSARSA
         %
-        function [Rtot, path] = sampleAC(self, s)
+        % Run an episode and update V-values and policy using actor-critic
+        %
+
+        function res = sampleAC(varargin)
+            self = varargin{1};
+            res = self.sample_helper(@self.init_sampleAC, @self.stepAC, varargin{2:end});
+        end
+
+        function state = init_sampleAC(self, s)
             if ~exist('s', 'var')
                 s = find(self.map == self.agent_symbol);
             end
             assert(numel(find(self.I == s)) == 1);
 
-            Rtot = 0;
-            path = [];
+            state.Rtot = 0;
+            state.path = [];
+            state.s = s;
+            state.a = -1;
+            state.done = false;
+            state.r = 0;
+            state.pe = 0;
+        end
 
-            map = self.map;
-            disp(map);
-            while true
-                Rtot = Rtot + self.R(s);
-                path = [path, s];
+        function state = stepAC(self, state)
+            s = state.s;
 
-                [x, y] = self.I2pos(s);
-                
-                a = self.softmax(s);
-                new_s = samplePF(self.P(:,s,a));
+            state.Rtot = state.Rtot + self.R(s);
+            state.path = [state.path, s];
+
+            a = self.softmax(s);
+            new_s = samplePF(self.P(:,s,a));
+       
+            r = self.R(new_s);
+            pe = r + self.gamma * self.V(new_s) - self.V(s);
+            self.V(s) = self.V(s) + self.alpha * pe;
+            self.H(s, a) = self.H(s, a) + self.beta * pe;
             
-                oldV = self.V(s); % for debugging
-                pe = self.R(new_s) + self.gamma * self.V(new_s) - self.V(s);
-                self.V(s) = self.V(s) + self.alpha * pe;
-                self.H(s, a) = self.H(s, a) + self.beta * pe;
-                
-                if ismember(new_s, self.B)
-                    % Boundary state
-                    %
-                    fprintf('(%d, %d), %d --> END [%.2f%%], old V = %.2f, pe = %.2f, V = %.2f\n', x, y, a, self.P(new_s, s, a) * 100, oldV, pe, self.V(s));
-
-                    Rtot = Rtot + self.R(new_s);
-                    path = [path, new_s];
-                    break;
-                end
-
-                % Internal state
+            if ismember(new_s, self.B)
+                % Boundary state
                 %
-                [new_x, new_y] = self.I2pos(new_s);
-                
-                map(x, y) = self.empty_symbol;
-                map(new_x, new_y) = self.agent_symbol;
-                
-                fprintf('(%d, %d), %d --> (%d, %d) [%.2f%%], old V = %.2f, pe = %.2f, V = %.2f\n', x, y, a, new_x, new_y, self.P(new_s, s, a) * 100, oldV, pe, self.V(s));
-                disp(map);
-                
-                s = new_s;
+                state.Rtot = state.Rtot + self.R(new_s);
+                state.path = [state.path, new_s];
+                state.done = true;
             end
-            fprintf('Total reward: %d\n', Rtot);
+
+            state.s = new_s;
+            state.a = a;
+            state.r = r;
+            state.pe = pe;
         end
 
         % Generic function that samples paths given a state initializer and a step function

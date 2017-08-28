@@ -175,13 +175,13 @@ T = TD([
 %    T.sampleSARSA(find(map == 'X'), true);
 %end
 
-for i = 1:20
-    T.sampleQ(find(map == 'X'), true);
-end
-
 %for i = 1:20
-%    T.sampleAC();
+%    T.sampleQ(find(map == 'X'), true);
 %end
+
+for i = 1:20
+    T.sampleAC(find(map == 'X'), true);
+end
 
 %T.solveGPI();
 %T.sampleGPI();
@@ -189,7 +189,7 @@ end
 %% Options framework
 %
 
-fprintf('\n\n\n\n\n\n\n\n--------------------------------- Options ----------------------------------\n\n\n\n\n\n\n');
+fprintf('\n\n\n\n\n\n\:n\n--------------------------------- Options ----------------------------------\n\n\n\n\n\n\n');
 
 map = [
     '$####';

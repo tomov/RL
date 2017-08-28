@@ -1,10 +1,11 @@
 fprintf('\n\n\n----------  LMDP ------------\n\n\n');
 
 
-L = LMDP([
-    '$####';
-    '.#X..';
-    '.....']);
+map = ['$####';
+       '.#X..';
+       '.....'];
+%L = LMDP(map, find(ismember(map, '.$')));
+L = LMDP(map);
 L.solveLMDP();
 L.sample();
 
@@ -71,6 +72,20 @@ map = [
 H = HMLMDP(map);
 H.solve();
 
+%% Full HMLMDP
+%
+
+fprintf('\n\n\n\n\n\n\n\n--------------------------------- Full HMLMDP ----------------------------------\n\n\n\n\n\n\n');
+
+map = [
+    '$####';
+    '.#X..';
+    '.....'];
+H = HMLMDP(map, true);
+H.solve();
+
+
+
 %% Big HMLMDP
 %
 
@@ -89,6 +104,30 @@ map = [
     '.0S....S#..';
     '.....#..$..'];
 H = HMLMDP(map);
+H.solve();
+
+self = H; % for debugging
+
+
+
+%% Big full HMLMDP
+%
+
+fprintf('\n\n\n\n\n\n\n\n--------------------------------- big full HMLMDP ----------------------------------\n\n\n\n\n\n\n');
+
+map = [
+    '.X...#.....';
+    '.....#.....';
+    '..#........';
+    '.#...#..##.';
+    '.....#.....';
+    '#.####.....';
+    '.....###.##';
+    '..#..#.....';
+    '..#..#.....';
+    '........#..';
+    '.....#..$..'];
+H = HMLMDP(map, true);
 H.solve();
 
 self = H; % for debugging

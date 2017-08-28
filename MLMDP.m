@@ -43,8 +43,10 @@ classdef MLMDP < LMDP
         % Create a MLMDP from a maze with multiple goal states;
         % creates a separate task for each goal state
         %
-        function self = MLMDP(map)
-            self = self@LMDP(map);
+        function self = MLMDP(map, absorbing_inds)
+            if ~exist('absorbing_inds', 'var'), absorbing_inds = []; end
+
+            self = self@LMDP(map, absorbing_inds);
             
             Nb = numel(self.B);
 

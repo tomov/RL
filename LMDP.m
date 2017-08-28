@@ -52,7 +52,6 @@ classdef LMDP < handle
         a = []; % a(s'|s) = active transition probability from s to s'
 
         I2B = []; % I2B(s) = corresponding B state for given I state s, or 0 if none
-        B2I = []; % B2I(s) = corresponding I state for given B state s
 
         % Maze stuff
         %
@@ -63,10 +62,16 @@ classdef LMDP < handle
 
         % Initialize a LMDP from a maze
         %
-        function self = LMDP(map)
+        function self = LMDP(map, absorbing_inds)
             self.map = map; % so we can use pos2I
 
-            absorbing_inds = find(ismember(map, self.absorbing_symbols)); % goal squares = internal states with corresponding boundary states
+            % can optionally supply a list of I states that should have corresponding B states. This is useful for the hierarchical stuff.
+            % If not, looks for them in the maze (the usual)
+            %
+            if ~exist('absorbing_inds', 'var') || isempty(absorbing_inds)
+                absorbing_inds = find(ismember(map, LMDP.absorbing_symbols)); % goal squares = internal states with corresponding boundary states
+            end
+
             I_with_B = absorbing_inds;
             Ni = numel(map); % internal states = all squares, including walls (useful for (x,y) --> state)
             Nb = numel(I_with_B); % boundary states
@@ -80,11 +85,8 @@ classdef LMDP < handle
             self.B = B;
 
             I2B = zeros(N, 1);
-            B2I = zeros(N, 1);
             I2B(I_with_B) = B; % mapping from I states to corresponding B states
-            B2I(I2B(I2B > 0)) = I_with_B; % mapping from B states to corresponding I states
-            self.I2B = I2B;
-            self.B2I = B2I;
+            %B2I(I2B(I2B > 0)) = I_with_B; % mapping from B states to corresponding I states
 
             P = zeros(N, N); % passive transitions P(s'|s); defaults to 0
             R = nan(N, 1); % instantaneous reward f'n R(s)
@@ -148,7 +150,7 @@ classdef LMDP < handle
                         % There's also a boundary state in this square
                         %
                         assert(ismember(s, absorbing_inds));
-                        assert(ismember(map(x, y), self.absorbing_symbols));
+                        %assert(ismember(map(x, y), LMDP.absorbing_symbols)); <-- not necessarily; if we supplied the boundary states explicitly, may not be
 
                         b = I2B(s);
 
@@ -161,13 +163,17 @@ classdef LMDP < handle
                         %
                         switch map(x, y)
                             case '$'
-                                R(b) = 10; % $$$ #KNOB
+                                R(b) = 10; % $$$
                                 
                             case '-'
-                                R(b) = -Inf; % :( #KNOB
+                                R(b) = -Inf;
                                 
                             otherwise
-                                R(b) = str2num(map(x, y)); % e.g. 9 = $9 #KNOB
+                                if ismember(map(x,y), LMDP.absorbing_symbols)
+                                    R(b) = str2num(map(x, y)); % e.g. 9 = $9
+                                else
+                                    R(b) = -Inf; % by default
+                                end
                         end   
                     end
                 end
@@ -179,6 +185,7 @@ classdef LMDP < handle
             self.P = P;
             self.R = R;
             self.q = q;
+            self.I2B = I2B;
 
             self.sanityLMDP();
         end
@@ -312,8 +319,6 @@ classdef LMDP < handle
             N = numel(self.S);
             assert(N == size(self.S, 2));
             assert(size(self.S, 1) == 1);
-            assert(sum(self.I2B > 0) == numel(self.B));
-            assert(sum(self.B2I > 0) == numel(self.B));
             
             % States <--> maze -- these are our custom things designed for the task
             %

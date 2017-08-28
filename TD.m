@@ -36,10 +36,6 @@ classdef TD < handle
         H = []; % H(s, a) = modifiable policy parameters, for actor-critic 
         pi = []; % pi(s) = policy = what action to take in state s (deterministic), for policy iteration
 
-        I2B = []; % I2B(s) = corresponding B state for given I state s, or 0 if none
-        B2I = []; % B2I(s) = corresponding I state for given B state s
-
-
         % Maze stuff
         %
         map = [];
@@ -68,11 +64,7 @@ classdef TD < handle
             self.A = A;
 
             I2B = zeros(N, 1);
-            B2I = zeros(N, 1);
             I2B(I_with_B) = B; % mapping from I states to corresponding B states
-            B2I(I2B(I2B > 0)) = I_with_B; % mapping from B states to corresponding I states
-            self.I2B = I2B;
-            self.B2I = B2I;
 
             P = zeros(N, N, numel(A)); % transitions P(s'|s,a); defaults to 0
             Q = zeros(N, numel(A)); % Q-values Q(s, a)

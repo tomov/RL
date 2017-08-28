@@ -59,7 +59,11 @@ classdef HMLMDP
     end
 
     methods 
-        function self = HMLMDP(arg)
+        function self = HMLMDP(arg, full)
+            if ~exist('full', 'var')
+                full = false; % whether to have S and B state for every I state, or to use the map
+            end
+
             if isa(arg, 'HMLMDP')
                 %
                 % We're at the next level of the hierarchy
@@ -93,11 +97,15 @@ classdef HMLMDP
                 %Pb = M1.Pb * inv(eye(M1.Ni) - M1.Pi) * M1.Pt'; Eq 9 from Saxe et al (2017)
                 Pb = eye(Ni) * LMDP.P_I_to_B; % small prob I --> B
 
+                % TODO dedupe with Augment P in AMLMDP
                 M.P = zeros(N, N);
                 M.P(M.I, M.I) = Pi;
                 M.P = (1 - LMDP.P_I_to_B) * M.P ./ sum(M.P, 1); % normalize but leave room for P_I_to_B
                 M.P(isnan(M.P)) = 0;
                 M.P(M.B, M.I) = Pb; % b/c these are normalized to begin with
+                % normalize
+                M.P = M.P ./ sum(M.P, 1);
+                M.P(isnan(M.P)) = 0;
                 assert(sum(abs(sum(M.P, 1) - 1) < 1e-8 | abs(sum(M.P, 1)) < 1e-8) == N);
 
                 % Compute P(end up at given B state | start at given St state) based on the lower level passive dynamics; we need this for calculating the boundary rewards
@@ -116,10 +124,21 @@ classdef HMLMDP
                 map = arg;
                 assert(ischar(map));
 
-                subtask_inds = find(map == HMLMDP.subtask_symbol)';
-                map(subtask_inds) = LMDP.empty_symbol; % even though AMLMDP's are aware of subtask states, they don't want them in the map b/c they just pass it down to the MLMDP's which don't know what those are
+                if full
+                    % each I state has a corresponding B state and St state
+                    %
+                    subtask_inds = 1:numel(map);
+                    absorbing_inds = 1:numel(map);
+                    assert(isempty(find(map == HMLMDP.subtask_symbol))); % in this case, do not supply S states, just pass a regular ol' map
+                else
+                    % S = subtask (St) state, $ or number = boundary (B) state
+                    %
+                    subtask_inds = find(map == HMLMDP.subtask_symbol)';
+                    absorbing_inds = []; % infer them from the map
+                    map(subtask_inds) = LMDP.empty_symbol; % even though AMLMDP's are aware of subtask states, they don't want them in the map b/c they just pass it down to the MLMDP's which don't know what those are
+                end
 
-                self.M = AMLMDP(map, subtask_inds);
+                self.M = AMLMDP(map, subtask_inds, absorbing_inds);
                 self.next = HMLMDP(self);
             end
         end

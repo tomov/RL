@@ -23,19 +23,17 @@ classdef AMLMDP < MLMDP
 
     properties (Access = public)
         St = []; % subtask states
-
-        I2St = []; % = corresponding St state for given I state s, or 0 if none
-        St2I = []; % = corresponding I state for given St state s
     end
 
     methods 
 
-        function self = AMLMDP(map, subtask_inds)
-            self = self@MLMDP(map);
+        function self = AMLMDP(map, subtask_inds, absorbing_inds)
+            if ~exist('absorbing_inds', 'var'), absorbing_inds = []; end
+
+            self = self@MLMDP(map, absorbing_inds);
             N = numel(self.S);
             Nb = numel(self.B);
 
-            assert(isempty(intersect(map(subtask_inds), self.absorbing_symbols))); % subtask states must be distinct from boundary/absorbing states; by our design -- otherwise they conflict in I2B vs. I2St, as well as P_I_to_B vs. P_I_to_St (b/c we want those to be normalized probs)
             assert(size(subtask_inds, 1) == 1); % must be a row vector, just like S and St
 
             % Augment state space S with St states
@@ -51,18 +49,8 @@ classdef AMLMDP < MLMDP
 
             % Mappings between I states an St states
             %
-            I2St = zeros(N_augm, 1);
-            St2I = zeros(N_augm, 1);
-            I2St(I_with_St) = St; % mapping from I states to corresponding St states
-            St2I(I2St(I2St > 0)) = I_with_St; % mapping from St states to corresponding I states
-            self.I2St = I2St;
-            self.St2I = St2I;
-            I2B_augm = zeros(N_augm, 1);
-            B2I_augm = zeros(N_augm, 1);
-            I2B_augm(self.S) = self.I2B;
-            I2B_augm = I2B_augm + I2St;
-            B2I_augm(self.S) = self.B2I;
-            B2I_augm = B2I_augm + St2I;
+            %I2St(I_with_St) = St; % mapping from I states to corresponding St states
+            %St2I(I2St(I2St > 0)) = I_with_St; % mapping from St states to corresponding I states
            
             % To be consistent
             %
@@ -85,8 +73,9 @@ classdef AMLMDP < MLMDP
             % Augment P 
             P_augm = zeros(N_augm, N_augm);
             P_augm(self.S, self.S) = self.P;
-            P_augm(:, I_with_St) = P_augm(:, I_with_St) * (1 - self.P_I_to_St); % since P_I_to_St is normalized, we need to make 'room' for it
-            I_to_St = sub2ind(size(P_augm), St, I_with_St); 
+            P_augm(:, I_with_St) = P_augm(:, I_with_St) * (1 - self.P_I_to_St); % since P_I_to_St is normalized, we need to make 'room' for it; notice that this also de-normalizes the I --> B transition for states in I_with_St (makes it smaller than P_I_to_B)
+            which = ~ismember(map(I_with_St), LMDP.impassable_symbols); % exclude I's that you can't get to anyway
+            I_to_St = sub2ind(size(P_augm), St(which), I_with_St(which));
             P_augm(I_to_St) = self.P_I_to_St;
             assert(sum(abs(sum(P_augm, 1) - 1) < 1e-8 | abs(sum(P_augm, 1)) < 1e-8) == N_augm);
 
@@ -98,8 +87,6 @@ classdef AMLMDP < MLMDP
             self.B = B_augm;
             self.Qb = Qb_augm;
             self.P = P_augm;
-            self.I2B = I2B_augm;
-            self.B2I = B2I_augm;
             self.R = R_augm;
         end
     end

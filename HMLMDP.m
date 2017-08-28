@@ -37,7 +37,7 @@
 % and in turn re-compute qb, w, zi, and a(s'|s) on the lower layer.
 % Then we go back to the lower layer and continue sampling.
 %
-classdef HMLMDP
+classdef HMLMDP < handle
 
     properties (Constant = true)
         subtask_symbol = 'S';
@@ -58,6 +58,10 @@ classdef HMLMDP
         next = []; % next level HMLMDP #recursion
 
         Ptb = []; % probability of ending at a given B state under passive dynamics, given that we've started at a St state. Used to compute the next-level boundary rewards
+
+        state_gui = []; % state for the GUI step-through
+        map_gui = []; % figure for the GUI
+        Zi_gui = []; % figure for the GUI
     end
 
     methods 
@@ -216,11 +220,9 @@ classdef HMLMDP
             end
         end
 
-
         % Sample a path through the HMLMDP
         %
         function [Rtot, path] = sample(self, s)
-
             if ~exist('s', 'var')
                 state = self.init_sample();
             else
@@ -302,6 +304,8 @@ classdef HMLMDP
             state.s = s;
             state.done = false;
             state.s_next_level = [];
+            state.rb_next_level = zeros(numel(self.M.St), 1);
+            state.rt = zeros(numel(self.M.St), 1);
         end
 
         % step through a sample path in the HMLMDP
@@ -337,9 +341,11 @@ classdef HMLMDP
                 zi = self.M.Zi * w;
                 %rb_next_level = log(zi(self.M.St2I(self.M.St))) * LMDP.lambda;
                 rb_next_level = log(Pt * zi) * LMDP.lambda;
+                state.rb_next_level = rb_next_level;
 
                 %rb_next_level = [4 -1]';
 
+                fprintf('\n\n ------- NEXT LEVEL ---------- \n\n');
                 fprintf('                rb_next_level = [%s]\n', sprintf('%.3f, ', rb_next_level));
                 self.next.M.solveMLMDP(rb_next_level);
 
@@ -353,6 +359,8 @@ classdef HMLMDP
                 ai = self.next.M.a(self.next.M.I, :);
                 Pi = self.next.M.P(self.next.M.I, :);
                 rt = (ai(:, s_next_level) - Pi(:, s_next_level)) * self.rt_coef; % Eq 10 from Saxe et al (2017)
+                state.rt = rt;
+
                 assert(size(rt, 1) == numel(self.M.St));
                 assert(size(rt, 2) == 1);
                 fprintf('               ai(:,s) = [%s]\n', sprintf('%.3f, ', ai(:, s_next_level)));
@@ -383,11 +391,76 @@ classdef HMLMDP
             end
         end
 
+        % Sample a path through the HMLMDP with a nice GUI
+        %
+        function [Rtot, path] = sample_gui(self, s)
+            if ~exist('s', 'var')
+                self.state_gui = self.init_sample();
+            else
+                self.state_gui = self.init_sample(s);
+            end
+
+			self.map_gui = figure;
+            self.Zi_gui = figure;
+            self.plot_gui();
+			step_button = uicontrol('Style', 'pushbutton', 'String', 'Step', ...
+									 'Position', [100 10 70 20], ...
+									 'Callback', @self.step_gui_callback);
+        end
+
+        function plot_gui(self)
+            figure(self.map_gui);
+
+            zi = self.M.z(self.M.I);
+            imagesc(reshape(zi, size(self.M.map)));
+            [x, y] = ind2sub(size(self.M.map), self.state_gui.s);
+            text(y, x, 'X', 'FontSize', 30, 'FontWeight', 'bold');
+            if self.state_gui.done
+                title(sprintf('FINISHED Total reward: %.2f', self.state_gui.Rtot));
+            else
+                title(sprintf('Total reward: %.2f', self.state_gui.Rtot));
+            end
+
+            figure(self.Zi_gui);
+            self.plotZi();
+
+            figure(self.map_gui);
+        end
+
+        function step_gui_callback(self, hObject, eventdata, handles)
+            if self.state_gui.done
+                return
+            end
+
+            disp(self.state_gui.s);
+            [x, y] = self.M.I2pos(self.state_gui.s);
+            old_s = self.state_gui.s;
+               
+            self.state_gui = self.step(self.state_gui);
+            self.plot_gui();
+
+            map = self.M.map;
+            if ismember(self.state_gui.s, self.M.I)
+                % Internal self.state_gui -> just move to it
+                %
+                [new_x, new_y] = self.M.I2pos(self.state_gui.s);
+                map(new_x, new_y) = LMDP.agent_symbol;
+                fprintf('(%d, %d) --> (%d, %d) [%.2f%%]\n', x, y, new_x, new_y, self.M.a(self.state_gui.s,old_s) * 100);
+                disp(map);
+
+            elseif ismember(new_s, self.M.St)
+                % Higher layer self.state_gui i.e. subtask self.state_gui
+                %
+                fprintf(' ... BACK FROM NEXT LEVEL! (%d, %d) --> %d [%.2f%%] !!!\n', x, y, self.state_gui.s_next_level, self.M.a(new_s, s) * 100);
+            else
+                fprintf('(%d, %d) --> END [%.2f%%]\n', x, y, self.M.a(self.state_gui.s, old_s) * 100);
+            end
+
+        end
 
 		% Plot the subtask desirability f'ns; only works for full HMLMDP's
 		%
         function plotZi(self)
-			figure;
             St_in_B = find(ismember(self.M.B, self.M.St));
 			for s = 1:numel(self.M.St)
 				zi = self.M.Zi(:, St_in_B(s));
@@ -396,6 +469,10 @@ classdef HMLMDP
 				ind = sub2ind([size(self.M.map, 2) size(self.M.map, 1)], y, x);
 				subplot(size(self.M.map, 1), size(self.M.map, 2), ind);
 				imagesc(reshape(zi, size(self.M.map)));
+
+                if ~isempty(self.state_gui)
+                    xlabel(sprintf('rb = %.2f, rt = %.2f', self.state_gui.rb_next_level(s), self.state_gui.rt(s)));
+                end
 			end
         end
 

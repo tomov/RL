@@ -56,7 +56,8 @@ map = [
     'S#X..';
     '0.S.0'];
 H = HMLMDP(map);
-H.sample();
+%H.sample();
+H.sample_gui();
 
 
 %% Full HMLMDP
@@ -150,10 +151,8 @@ map = [
     '........#..';
     '.....#..$..'];
 H = HMLMDP(map, true, 5);
-H.sample();
-
-H.plotZi();
-
+%H.sample();
+H.sample_gui();
 
 
 

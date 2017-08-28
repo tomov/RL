@@ -284,7 +284,7 @@ classdef HMLMDP < handle
             % Set up reward structure according to goal state(s)
             %
             state.rb = HMLMDP.R_nongoal * ones(numel(self.M.B), 1); % non-goal B states have q = 0
-            state.rb(find(self.M.B == e)) = HMLMDP.R_goal; % goal B states have an actual reward
+            state.rb(ismember(self.M.B, e)) = HMLMDP.R_goal; % goal B states have an actual reward
             state.rb(ismember(self.M.B, self.M.St)) = HMLMDP.R_St; % St states have a small reward to encourage exploring them every now and then
 
             % Find solution on current level based on reward structure
@@ -359,7 +359,6 @@ classdef HMLMDP < handle
 
                 % sample until a boundary state
                 %
-                save shit.mat;
                 [~, path] = self.next.M.sample(s_next_level); % not really necessary here
 
                 % recalculate reward structure on current level
@@ -368,7 +367,7 @@ classdef HMLMDP < handle
                 ai = self.next.M.a(self.next.M.I, :);
                 Pi = self.next.M.P(self.next.M.I, :);
                 rt = (ai(:, s_next_level) - Pi(:, s_next_level)) * self.rt_coef; % Eq 10 from Saxe et al (2017)
-                %state.rt = rt;
+                state.rt = rt;
 
                 assert(size(rt, 1) == numel(self.M.St));
                 assert(size(rt, 2) == 1);

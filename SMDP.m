@@ -1,5 +1,5 @@
 % Two-layer options framework as in Sutton et al (1999) based on semi-MDPs.
-% Can also be used with the hierarchical semi-Markov (HSM) framework of Dietterich (2000) by passing is_hsm = true.
+% Can also be used with the hierarchical semi-Markov Q-learning (HSMQ) of Dietterich (2000) by passing is_hsm = true.
 % Works with 'rooms' domain only.
 % Uses subgoals to define the options (as Sec 7)
 %
@@ -21,8 +21,8 @@ classdef SMDP < handle
         smdp = {}; % SMDP for each option
         mdp = []; % augmented MDP with the options as additional actions
 
-        % whether to solve as a HSM.
-        % If true, solve subtask SMDP's online along with the whole MDP (HSM framework, Dietterich 2000).
+        % whether to solve with HSMQ.
+        % If true, solve subtask SMDP's online along with the whole MDP (HSMQ algorithm, Dietterich 2000).
         % If false, pre-solve SMDP's and only solve the MDP online (Options framework, Sutton 1999).
         %
         is_hsm = false;
@@ -39,7 +39,7 @@ classdef SMDP < handle
         function self = SMDP(map, is_hsm)
             self.map = map;
             if ~exist('is_hsm', 'var')
-                is_hsm = false; % by default, we pre-solve the SMDP's i.e. we don't do HSM
+                is_hsm = false; % by default, we pre-solve the SMDP's i.e. we don't do HSMQ
             end
 
             %
@@ -173,7 +173,7 @@ classdef SMDP < handle
                 % sample a path from the policy of the option
                 %
                 if self.is_hsm
-                    % HSM framework (Dietterich 2000) -> subtask policies are learnt online
+                    % HSMQ algorithm (Dietterich 2000) -> subtask policies are learnt online
                     %
                     [~, option_path] = self.smdp{o}.sampleQ(s);
                 else

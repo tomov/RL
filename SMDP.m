@@ -2,7 +2,7 @@
 % Works with 'rooms' domain only.
 % Uses subgoals to define the options (as Sec 7)
 %
-classdef Options < handle
+classdef SMDP < handle
 
     properties (Constant = true)
         R_I = 0; % penalty for remaining stationary. TODO dedupe with TD.R_I = 0 TODO why does -1 not work -- it keeps wanting to stay still
@@ -28,16 +28,16 @@ classdef Options < handle
 
     methods
 
-        % Initialize an Options framework from a maze
+        % Initialize an SMDP from a maze
         %
-        function self = Options(map)
+        function self = SMDP(map)
             self.map = map;
 
             %
             % Set up options and their policies based on subtask states S
             %
 
-			subtask_inds = find(map == Options.subtask_symbol)';
+			subtask_inds = find(map == SMDP.subtask_symbol)';
             goal_inds = find(ismember(map, TD.absorbing_symbols));
 
 			map(subtask_inds) = TD.empty_symbol; % erase subtask states
@@ -53,7 +53,7 @@ classdef Options < handle
                 % Set rewards of 0 (TD.R_I) for all internal states
                 % and reward of 1 at the subtask state
                 %
-                map(s) = Options.pseudoreward_symbol;
+                map(s) = SMDP.pseudoreward_symbol;
 
                 T = TD(map);
                 T.solveGPI();
@@ -92,7 +92,7 @@ classdef Options < handle
             p = p(:);
             assert(sum(abs(p - 1) < 1e-8 | abs(p) < 1e-8) == numel(p));
 
-            T.R(T.I) = Options.R_I; % penalty for staying still
+            T.R(T.I) = SMDP.R_I; % penalty for staying still
 
             self.O = O;
             self.aT = T;
@@ -213,7 +213,8 @@ classdef Options < handle
 			self.aT.gui_map = figure;
             self.aT.plot_gui();
 
-            step_callback = @(hObject, eventdata) self.step_gui_callback(step_fn, hObject, eventdata); % notice this is differnet -- it's the local stepping one so we can customize it for the options
+            step_callback = @(hObject, eventdata) self.aT.step_gui_callback(step_fn, hObject, eventdata);
+            recursive_step_callback = @(hObject, eventdata) self.step_gui_callback(step_fn, hObject, eventdata); % notice this is differnet -- it's the local stepping one so we can customize it for the options
             start_callback = @(hObject, eventdata) self.aT.start_gui_callback(hObject, eventdata);
             reset_callback = @(hObject, eventdata) self.aT.reset_gui_callback(init_fn, hObject, eventdata);
             stop_callback = @(hObject, eventdata) stop(self.aT.gui_timer);
@@ -231,7 +232,7 @@ classdef Options < handle
 					 'Callback', reset_callback);
 			uicontrol('Style', 'pushbutton', 'String', 'Step', ...
 			  		 'Position', [10 30 70 20], ...
-			  		 'Callback', step_callback);
+			  		 'Callback', recursive_step_callback);
 			uicontrol('Style', 'pushbutton', 'String', 'Skip', ...
 					 'Position', [10 10 70 20], ...
 					 'Callback', sample_callback);

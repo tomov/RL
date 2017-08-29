@@ -2,7 +2,7 @@
 % For 'rooms' domain only
 % TODO dedupe with LMDP
 %
-classdef TD < handle
+classdef MDP < handle
 
     properties (Constant = true)
         % General
@@ -51,7 +51,7 @@ classdef TD < handle
 
         % Initialize an MDP from a maze
         %
-        function self = TD(map)
+        function self = MDP(map)
             self.map = map; % so we can use pos2I
 
             absorbing_inds = find(ismember(map, self.absorbing_symbols)); % goal squares = internal states with corresponding boundary states

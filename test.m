@@ -193,7 +193,7 @@ H.sample_gui();
 fprintf('\n\n\n---------- TD(0) learning ------------\n\n\n');
 
 
-T = TD([
+T = MDP([
     '$####';
     '.#X..';
     '.....']);

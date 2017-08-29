@@ -191,6 +191,8 @@ classdef SMDP < handle
                 fprintf('       option! %d -> path = %s, rs = %s\n', o, sprintf('%d ', option_path), sprintf('%.2f ', rs));
                 r = sum(rs);
                 pe = r + (MDP.gamma ^ k) * max(self.mdp.Q(new_s, :)) - self.mdp.Q(s, a);
+
+                state.Rtot = state.Rtot + sum(self.mdp.R(option_path(1:end-1)));
             else
                 %
                 % primitive action -> regular Q learning

@@ -278,3 +278,18 @@ S = SMDP(map, true);
 %S.sampleQ(find(map == 'X'), true);
 S.sampleQ_gui();
 
+
+
+
+%% MAXQ framework
+%
+
+fprintf('\n\n\n\n\n\n\n\n--------------------------------- MAXQ ----------------------------------\n\n\n\n\n\n\n');
+
+map = [
+    '$####';
+    'B#AAA';
+    'BBAAA'];
+M = MAXQ(map);
+%M.sampleQ(find(map == 'X'), true);
+%M.sampleQ_gui();

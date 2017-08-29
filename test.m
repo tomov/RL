@@ -187,6 +187,15 @@ H.sample_gui();
 
 
 
+
+
+
+
+
+
+
+
+
 %% TD(0) learning
 %
 
@@ -198,36 +207,38 @@ T = MDP([
     '.#X..';
     '.....']);
 
+
 for i = 1:20
     T.sampleSARSA(find(map == 'X'), true);
 end
-%T.sampleSARSA_gui();
+T.sampleSARSA_gui();
 
 for i = 1:20
     T.sampleQ(find(map == 'X'), true);
 end
-%T.sampleQ_gui();
+T.sampleQ_gui();
 
 for i = 1:20
     T.sampleAC(find(map == 'X'), true);
 end
-%T.sampleAC_gui();
+T.sampleAC_gui();
 
 T.solveGPI();
 T.sampleGPI();
-%T.sampleGPI_gui();
+T.sampleGPI_gui();
+
 
 %% Options framework
 %
 
-fprintf('\n\n\n\n\n\n\:n\n--------------------------------- Options ----------------------------------\n\n\n\n\n\n\n');
+fprintf('\n\n\n\n\n\n\n\n--------------------------------- Options ----------------------------------\n\n\n\n\n\n\n');
 
 map = [
     '$####';
     'S#..X';
     '..S..'];
 S = SMDP(map);
-S.sampleQ(find(map == 'X'), true);
+%S.sampleQ(find(map == 'X'), true);
 S.sampleQ_gui();
 
 
@@ -251,5 +262,19 @@ map = [
 S = SMDP(map);
 %O.sampleQ(find(map == 'X'), true);
 %O.sampleQ();
+S.sampleQ_gui();
+
+
+%% HSM framework
+%
+
+fprintf('\n\n\n\n\n\n\n\n--------------------------------- HSM ----------------------------------\n\n\n\n\n\n\n');
+
+map = [
+    '$####';
+    'S#..X';
+    '..S..'];
+S = SMDP(map, true);
+%S.sampleQ(find(map == 'X'), true);
 S.sampleQ_gui();
 

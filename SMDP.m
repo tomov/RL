@@ -1,11 +1,12 @@
 % Two-layer options framework as in Sutton et al (1999) based on semi-MDPs.
+% Can also be used with the hierarchical semi-Markov (HSM) framework of Dietterich (2000) by passing is_hsm = true.
 % Works with 'rooms' domain only.
 % Uses subgoals to define the options (as Sec 7)
 %
 classdef SMDP < handle
 
     properties (Constant = true)
-        R_I = 0; % penalty for remaining stationary. TODO dedupe with MDP.R_I = 0 TODO why does -1 not work -- it keeps wanting to stay still
+        R_I = -1; % penalty for remaining stationary. TODO dedupe with MDP.R_I 
 
         % Maze
         %
@@ -20,6 +21,12 @@ classdef SMDP < handle
         smdp = {}; % SMDP for each option
         mdp = []; % augmented MDP with the options as additional actions
 
+        % whether to solve as a HSM.
+        % If true, solve subtask SMDP's online along with the whole MDP (HSM framework, Dietterich 2000).
+        % If false, pre-solve SMDP's and only solve the MDP online (Options framework, Sutton 1999).
+        %
+        is_hsm = false;
+
         % Maze
         %
         map = [];
@@ -29,8 +36,11 @@ classdef SMDP < handle
 
         % Initialize an SMDP from a maze
         %
-        function self = SMDP(map)
+        function self = SMDP(map, is_hsm)
             self.map = map;
+            if ~exist('is_hsm', 'var')
+                is_hsm = false; % by default, we pre-solve the SMDP's i.e. we don't do HSM
+            end
 
             %
             % Set up options and their policies based on subtask states S
@@ -42,7 +52,7 @@ classdef SMDP < handle
 			map(subtask_inds) = MDP.empty_symbol; % erase subtask states
 			map(goal_inds) = MDP.empty_symbol; % erase goal states
 
-            O = 1:numel(subtask_inds); % 
+            O = 1:numel(subtask_inds); 
             self.pi = cell(numel(O), 1); % set of policies for each option
 
             % For each subtask, find the optimal policy that gets you
@@ -54,15 +64,18 @@ classdef SMDP < handle
                 %
                 map(s) = SMDP.pseudoreward_symbol;
 
-                T = MDP(map);
-                T.solveGPI();
+                smdp = MDP(map);
+                if ~is_hsm
+                    smdp.solveGPI(); % in regular Options framework, we assume the policies of the subtasks are given
+                end
                 
                 o = find(subtask_inds == s);
-                self.pi{o} = T.pi; % policy for option o corresponding to subtask with goal state s
-                self.smdp{o} = T; % for debugging
+                self.pi{o} = smdp.pi; % policy for option o corresponding to subtask with goal state s
+                self.smdp{o} = smdp;
 
                 map(s) = MDP.empty_symbol;
 			end
+            self.is_hsm = is_hsm;
 
             %
             % Create a augmented MDP with the options
@@ -71,30 +84,30 @@ classdef SMDP < handle
             map = self.map;
             map(subtask_inds) = '.'; % erase subtask states
 
-            T = MDP(map);
+            mdp = MDP(map);
 
-            O = numel(T.A) + 1 : numel(T.A) + numel(subtask_inds); % set of options = set of subtasks = set of subtask goal states; immediately follow the regular actions in indexing
-            T.A = [T.A, O]; % augment actions with options
+            O = numel(mdp.A) + 1 : numel(mdp.A) + numel(subtask_inds); % set of options = set of subtasks = set of subtask goal states; immediately follow the regular actions in indexing
+            mdp.A = [mdp.A, O]; % augment actions with options
 
             % Augment transitions P(s'|s,a)
             %
-            N = numel(T.S);
-            T.Q = zeros(N, numel(T.A));
+            N = numel(mdp.S);
+            mdp.Q = zeros(N, numel(mdp.A));
             for a = O % for each action that is an option
                 o = find(O == a);
                 s = subtask_inds(o);
-                T.P(s, :, a) = 1; % from wherever we take the option, we end up at its goal state (b/c its policy is deterministic)
-                T.P(s, s, a) = 0; % ...except from its goal state -- can't take the option there (makes no sense)
+                mdp.P(s, :, a) = 1; % from wherever we take the option, we end up at its goal state (b/c its policy is deterministic)
+                mdp.P(s, s, a) = 0; % ...except from its goal state -- can't take the option there (makes no sense)
             end
             % sanity check them
-            p = sum(T.P, 1);
+            p = sum(mdp.P, 1);
             p = p(:);
             assert(sum(abs(p - 1) < 1e-8 | abs(p) < 1e-8) == numel(p));
 
-            T.R(T.I) = SMDP.R_I; % penalty for staying still
+            mdp.R(mdp.I) = SMDP.R_I; % penalty for staying still
 
             self.O = O;
-            self.mdp = T;
+            self.mdp = mdp;
         end 
 
         %
@@ -119,6 +132,8 @@ classdef SMDP < handle
 
             state.Rtot = 0;
             state.path = [];
+            state.rs = [];
+            state.pes = [];
             state.s = s;
             pi = self.mdp.eps_greedy(s);
             state.pi = pi;
@@ -150,23 +165,38 @@ classdef SMDP < handle
             %
             oldQ = self.mdp.Q(s,a); % for debugging
             if ismember(a, self.O)
+                %
                 % option -> execute option policy until the end
                 %
                 o = find(self.O == a);
-                [~, option_path] = self.smdp{o}.sampleGPI(s); % execute option policy
-                option_path = option_path(2:end-1); % don't count s and fake B state
+
+                % sample a path from the policy of the option
+                %
+                if self.is_hsm
+                    % HSM framework (Dietterich 2000) -> subtask policies are learnt online
+                    %
+                    [~, option_path] = self.smdp{o}.sampleQ(s);
+                else
+                    % Options framework (Sutton 1999) -> subtask policies are given (precomputed)
+                    %
+                    [~, option_path] = self.smdp{o}.sampleGPI(s);
+                end
+
+                option_path = option_path(2:end-1); % don't count s (starting) and fake B (terminal) state
                 k = numel(option_path);
                 assert(k > 0); % b/c can't take an option from its goal state
                 state.path = [state.path, option_path(1:end-1)];
 
-                r = self.mdp.R(option_path) .* MDP.gamma .^ (0:k-1)'; % from Sec 3.2 of Sutton (1999)
-                fprintf('       option! %d -> path = %s, r = %s\n', o, sprintf('%d ', option_path), sprintf('%.2f ', r));
-                r = sum(r);
-                pe = sum(r) + (MDP.gamma ^ k) * max(self.mdp.Q(new_s, :)) - self.mdp.Q(s, a);
+                rs = self.mdp.R(option_path) .* MDP.gamma .^ (0:k-1)'; % from Sec 3.2 of Sutton (1999)
+                fprintf('       option! %d -> path = %s, rs = %s\n', o, sprintf('%d ', option_path), sprintf('%.2f ', rs));
+                r = sum(rs);
+                pe = r + (MDP.gamma ^ k) * max(self.mdp.Q(new_s, :)) - self.mdp.Q(s, a);
             else
+                %
                 % primitive action -> regular Q learning
                 %
                 r = self.mdp.R(new_s);
+                fprintf('     nonoption %d -> go to %d, r = %.2f\n', a, new_s, r);
                 pe = r + MDP.gamma * max(self.mdp.Q(new_s, :)) - self.mdp.Q(s, a);
             end
 
@@ -191,6 +221,8 @@ classdef SMDP < handle
                 state.pe = pe;
                 state.pi = pi;
             end
+            state.rs = [state.rs, r];
+            state.pes = [state.pes, pe];
 
             % for GUI
             %
@@ -221,19 +253,19 @@ classdef SMDP < handle
 
             self.mdp.gui_timer = timer('Period', 0.1, 'TimerFcn', step_callback, 'ExecutionMode', 'fixedRate', 'TasksToExecute', 1000000);
 			uicontrol('Style', 'pushbutton', 'String', 'Start', ...
-			  		 'Position', [10 90 70 20], ...
+			  		 'Position', [10 50 + 90 40 20], ...
 			  		 'Callback', start_callback);
 			uicontrol('Style', 'pushbutton', 'String', 'Stop', ...
-					 'Position', [10 70 70 20], ...
+					 'Position', [10 50 + 70 40 20], ...
 					 'Callback', stop_callback);
 			uicontrol('Style', 'pushbutton', 'String', 'Reset', ...
-					 'Position', [10 50 70 20], ...
+					 'Position', [10 50 + 50 40 20], ...
 					 'Callback', reset_callback);
 			uicontrol('Style', 'pushbutton', 'String', 'Step', ...
-			  		 'Position', [10 30 70 20], ...
+			  		 'Position', [10 25 + 30 40 20], ...
 			  		 'Callback', recursive_step_callback);
 			uicontrol('Style', 'pushbutton', 'String', 'Skip', ...
-					 'Position', [10 10 70 20], ...
+					 'Position', [10 10 40 20], ...
 					 'Callback', sample_callback);
         end
 
@@ -252,8 +284,17 @@ classdef SMDP < handle
                 assert(ismember(a, self.O));
                 self.mdp.gui_state.in_option = false; % next time just move on
                 o = find(self.O == a);
-                fprintf('  ...executing action %d = option %d, from state %d', a, o, s);
-                self.smdp{o}.sampleGPI_gui(s);
+                fprintf('  ...executing action %d = option %d, from state %d\n', a, o, s);
+                if self.is_hsm
+                    % WARNING: this will update the Q values of the option, i.e. if you step through this
+                    % for every option, you will effectively be running two iterations of Q-learning.
+                    % This is not necessarily a bad thing in the GUI as we want things to converge faster anyway,
+                    % it will just be slightly different than the non-GUI case
+                    % 
+                    self.smdp{o}.sampleQ_gui(s);
+                else
+                    self.smdp{o}.sampleGPI_gui(s);
+                end
             else
                 self.mdp.step_gui_callback(step_fn, hObject, eventdata);
             end

@@ -7,7 +7,7 @@ classdef MDP < handle
     properties (Constant = true)
         % General
         % 
-        R_I = 0; % penalty for staying in one place
+        R_I = -1; % penalty for staying in one place
         alpha = 0.5; % learning rate
         gamma = 0.9; % discount rate
         eps = 0.1; % eps for eps-greedy
@@ -192,7 +192,6 @@ classdef MDP < handle
 
             self.V(self.B) = self.R(self.B); % boundary V(s) = R(s)
 
-            assert(min(self.R(self.I)) >= 0); % doesn't work with negative internal rewards -> V(s)'s keep going towards -infinity forever
             assert(self.gamma < 1); % doesn't work with gamma = 1 -> the states start going around in circles after a few iterations
 
             policy_stable = false;
@@ -255,6 +254,8 @@ classdef MDP < handle
 
             state.Rtot = 0;
             state.path = [];
+            state.rs = [];
+            state.pes = [];
             state.s = s;
             state.a = self.pi(s);
             state.pi = zeros(size(self.A));
@@ -272,6 +273,7 @@ classdef MDP < handle
 
             new_s = samplePF(self.P(:, s, a));
             new_a = self.pi(new_s);
+            r = self.R(new_s);
             pi = zeros(size(self.A));
             pi(new_a) = 1;
 
@@ -288,6 +290,8 @@ classdef MDP < handle
                 state.a = new_a;
                 state.pi = pi;
             end
+            state.rs = [state.rs, r];
+            state.pes = [state.pes, 0]; % no PEs; we're not learning any more
         end
 
         %
@@ -312,6 +316,8 @@ classdef MDP < handle
 
             state.Rtot = 0;
             state.path = [];
+            state.rs = [];
+            state.pes = [];
             state.s = s;
             pi = self.eps_greedy(s);
             state.pi = pi;
@@ -352,20 +358,22 @@ classdef MDP < handle
                 state.pe = pe;
                 state.pi = pi;
             end
+            state.rs = [state.rs, r];
+            state.pes = [state.pes, pe];
         end
 
         %
         % Run an episode and update Q-values using Q-learning
         %
 
-        function [Rtot, path] = sampleQ(varargin)
-            self = varargin{1};
-            [Rtot, path] = self.sample_helper(@self.init_sampleQ, @self.stepQ, varargin{2:end});
-        end
-
         function sampleQ_gui(varargin)
             self = varargin{1};
             self.sample_gui_helper(@self.init_sampleQ, @self.stepQ, varargin{2:end});
+        end
+
+        function [Rtot, path] = sampleQ(varargin)
+            self = varargin{1};
+            [Rtot, path] = self.sample_helper(@self.init_sampleQ, @self.stepQ, varargin{2:end});
         end
 
         function state = init_sampleQ(self, s)
@@ -376,6 +384,8 @@ classdef MDP < handle
 
             state.Rtot = 0;
             state.path = [];
+            state.rs = [];
+            state.pes = [];
             state.s = s;
             pi = self.eps_greedy(s);
             state.pi = pi;
@@ -416,6 +426,8 @@ classdef MDP < handle
                 state.pe = pe;
                 state.pi = pi;
             end
+            state.rs = [state.rs, r];
+            state.pes = [state.pes, pe];
         end
 
         %
@@ -440,6 +452,8 @@ classdef MDP < handle
 
             state.Rtot = 0;
             state.path = [];
+            state.rs = [];
+            state.pes = [];
             state.s = s;
             pi = self.softmax(s);
             state.pi = pi;
@@ -481,6 +495,8 @@ classdef MDP < handle
                 state.pe = pe;
                 state.pi = pi;
             end
+            state.rs = [state.rs, r];
+            state.pes = [state.pes, pe];
         end
 
         % Generic function that samples paths given a state initializer and a step function
@@ -540,21 +556,21 @@ classdef MDP < handle
             stop_callback = @(hObject, eventdata) stop(self.gui_timer);
             sample_callback = @(hObject, eventdata) self.sample_gui_callback(step_fn, hObject, eventdata);
 
-            self.gui_timer = timer('Period', 0.1, 'TimerFcn', step_callback, 'ExecutionMode', 'fixedRate', 'TasksToExecute', 1000000);
+            self.gui_timer = timer('Period', 0.5, 'TimerFcn', step_callback, 'ExecutionMode', 'fixedRate', 'TasksToExecute', 1000000);
 			uicontrol('Style', 'pushbutton', 'String', 'Start', ...
-			  		 'Position', [10 90 70 20], ...
+			  		 'Position', [10 50 + 90 40 20], ...
 			  		 'Callback', start_callback);
 			uicontrol('Style', 'pushbutton', 'String', 'Stop', ...
-					 'Position', [10 70 70 20], ...
+					 'Position', [10 50 + 70 40 20], ...
 					 'Callback', stop_callback);
 			uicontrol('Style', 'pushbutton', 'String', 'Reset', ...
-					 'Position', [10 50 70 20], ...
+					 'Position', [10 50 + 50 40 20], ...
 					 'Callback', reset_callback);
 			uicontrol('Style', 'pushbutton', 'String', 'Step', ...
-			  		 'Position', [10 30 70 20], ...
+			  		 'Position', [10 25 + 30 40 20], ...
 			  		 'Callback', step_callback);
 			uicontrol('Style', 'pushbutton', 'String', 'Skip', ...
-					 'Position', [10 10 70 20], ...
+					 'Position', [10 10 40 20], ...
 					 'Callback', sample_callback);
         end
 
@@ -612,7 +628,7 @@ classdef MDP < handle
 
             % plot map and current state-value f'n V(s)
             %
-            subplot(1, 4, 1);
+            subplot(2, 4, 1);
             vi = self.V(self.I);
             imagesc(reshape(vi, size(self.map)));
             [x, y] = ind2sub(size(self.map), self.gui_state.s);
@@ -628,7 +644,7 @@ classdef MDP < handle
 
             % plot map and current action-value f'n max Q(s, a)
             %
-            subplot(1, 4, 2);
+            subplot(2, 4, 2);
             qi = self.Q(self.I, :);
             qi = max(qi, [], 2);
             imagesc(reshape(qi, size(self.map)));
@@ -638,7 +654,7 @@ classdef MDP < handle
 
             % plot map and transition probability across all possible actions, P(.|s)
             %
-            subplot(1, 4, 3);
+            subplot(2, 4, 3);
             pi = self.gui_state.pi';
             p = squeeze(self.P(self.I, self.gui_state.s, :));
             p = p * pi;
@@ -649,12 +665,30 @@ classdef MDP < handle
 
             % plot map and current transition probability given the selected action, P(.|s,a)
             %
-            subplot(1, 4, 4);
+            subplot(2, 4, 4);
             p = self.P(self.I, self.gui_state.s, self.gui_state.a);
             imagesc(reshape(p, size(self.map)));
             [x, y] = ind2sub(size(self.map), self.gui_state.s);
             text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
             title('transition probability for chosen action P(.|s,a)');
+
+            % plot reward / PE history
+            %
+            rs = self.gui_state.rs;
+            pes = self.gui_state.pes;
+            %path = self.gui_state.path; <-- differs for SMDP
+            hist = 100;
+            if numel(rs) > hist
+                rs = rs(end-hist:end);
+                pes = pes(end-hist:end);
+                %path = path(end-hist:end);
+            end
+            subplot(2, 1, 2);
+            plot(rs);
+            hold on;
+            plot(pes);
+            hold off;
+            legend('rewards', 'PEs');
 
         end
 

@@ -1,5 +1,7 @@
 % Hierarchical multitask LMDP as described in Saxe et al (2017)
 % Customized for 'rooms' domain only, supports 2 layers only.
+% Can decompose the desirability basis matrix Zi using nonnegative matrix factorization
+% as described in Earle et al (2017) by passing full=true and k in the constructor.
 %
 % Given states S (split into internal states I, boundary states B, and subtask states St) and passive transition dynamics P(s'|s),
 % creates a two-layer hierarchical MLMDP. 

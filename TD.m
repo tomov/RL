@@ -566,8 +566,21 @@ classdef TD < handle
                 return
             end
 
+            [x, y] = self.I2pos(self.gui_state.s);
+            old_s = self.gui_state.s;
+            old_a = self.gui_state.a;
+
             self.gui_state = step_fn(self.gui_state);
             self.plot_gui();
+
+            if self.gui_state.done
+                fprintf('(%d, %d), %d --> END [%.2f%%]\n', x, y, old_a, self.P(self.gui_state.s, old_s, old_a) * 100);
+            else
+                [new_x, new_y] = self.I2pos(self.gui_state.s);
+                map(x, y) = self.empty_symbol;
+                map(new_x, new_y) = self.agent_symbol;
+                fprintf('(%d, %d), %d --> (%d, %d) [%.2f%%]\n', x, y, old_a, new_x, new_y, self.P(self.gui_state.s, old_s, old_a) * 100);
+            end
         end
 
         % Animate entire episode until the end
@@ -625,7 +638,7 @@ classdef TD < handle
 
             % plot map and transition probability across all possible actions, P(.|s)
             %
-            subplot(1, 4, 4);
+            subplot(1, 4, 3);
             pi = self.gui_state.pi';
             p = squeeze(self.P(self.I, self.gui_state.s, :));
             p = p * pi;

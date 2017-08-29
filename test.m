@@ -197,8 +197,10 @@ fprintf('\n\n\n\n\n\n\:n\n--------------------------------- Options ------------
 
 map = [
     '$####';
-    'S#X..';
-    '0.S.0'];
+    'S#..X';
+    '..S..'];
 O = Options(map);
 O.sampleQ(find(map == 'X'), true);
+
+O.sampleQ_gui();
 

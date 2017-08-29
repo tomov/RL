@@ -5,7 +5,7 @@
 classdef Options < handle
 
     properties (Constant = true)
-        R_I = -1; % penalty for remaining stationary. Different from TD.R_i = 0
+        R_I = 0; % penalty for remaining stationary. TODO dedupe with TD.R_I = 0 TODO why does -1 not work -- it keeps wanting to stay still
 
         % Maze
         %
@@ -92,7 +92,7 @@ classdef Options < handle
             p = p(:);
             assert(sum(abs(p - 1) < 1e-8 | abs(p) < 1e-8) == numel(p));
 
-            T.R(T.I) = Options.R_I; % different penalty for staying still
+            T.R(T.I) = Options.R_I; % penalty for staying still
 
             self.O = O;
             self.aT = T;
@@ -100,12 +100,16 @@ classdef Options < handle
 
         %
         % Run an episode and update Q-values using Q-learning
-        % TODO dedupe with TD
         %
+
+        function sampleQ_gui(varargin)
+            self = varargin{1};
+            self.sample_gui_helper(@self.init_sampleQ, @self.stepQ, varargin{2:end}); % we're using the local one
+        end
 
         function res = sampleQ(varargin)
             self = varargin{1};
-            res = self.sample_helper(@self.init_sampleQ, @self.stepQ, varargin{2:end});
+            res = self.aT.sample_helper(@self.init_sampleQ, @self.stepQ, varargin{2:end});
         end
 
         function state = init_sampleQ(self, s)
@@ -153,6 +157,7 @@ classdef Options < handle
                 option_path = option_path(2:end-1); % don't count s and fake B state
                 k = numel(option_path);
                 assert(k > 0); % b/c can't take an option from its goal state
+                state.path = [state.path, option_path(1:end-1)];
 
                 r = self.aT.R(option_path) .* TD.gamma .^ (0:k-1)'; % from Sec 3.2 of Sutton (1999)
                 fprintf('       option! %d -> path = %s, r = %s\n', o, sprintf('%d ', option_path), sprintf('%.2f ', r));
@@ -188,43 +193,63 @@ classdef Options < handle
             end
         end
 
-        % Generic function that samples paths given a state initializer and a step function
-        % TODO dedupe with TD.m it's exactly the same...
         %
-        function [Rtot, path] = sample_helper(self, init_fn, step_fn, s, do_print)
+        % Generic function that samples paths using a nice GUI
+        %
+
+        % TODO dedupe with TD
+        function sample_gui_helper(self, init_fn, step_fn, s)
             if ~exist('s', 'var')
-                state = init_fn();
+                self.aT.gui_state = init_fn();
             else
-                state = init_fn(s);
-            end
-            if ~exist('do_print', 'var')
-                do_print = false;
+                self.aT.gui_state = init_fn(s);
             end
 
-            map = self.map;
-            if do_print, disp(map); end
-            while ~state.done
-                [x, y] = self.aT.I2pos(state.s);
-                old_s = state.s;
-                old_a = state.a;
-               
-                state = step_fn(state); 
+			self.aT.gui_map = figure;
+            self.aT.plot_gui();
 
-                if state.done
-                    if do_print, fprintf('(%d, %d), %d --> END [%.2f%%]\n', x, y, old_a, self.aT.P(state.s, old_s, old_a) * 100); end
-                else
-                    [new_x, new_y] = self.aT.I2pos(state.s);
-                    map(x, y) = TD.empty_symbol;
-                    map(new_x, new_y) = TD.agent_symbol;
-                    if do_print, fprintf('(%d, %d), %d --> (%d, %d) [%.2f%%]\n', x, y, old_a, new_x, new_y, self.aT.P(state.s, old_s, old_a) * 100); end
-                    if do_print, disp(map); end
-                end
-            end
-            if do_print, fprintf('Total reward: %d\n', state.Rtot); end
+            step_callback = @(hObject, eventdata) self.step_gui_callback(step_fn, hObject, eventdata); % notice this is differnet -- it's the local stepping one so we can customize it for the options
+            start_callback = @(hObject, eventdata) self.aT.start_gui_callback(hObject, eventdata);
+            reset_callback = @(hObject, eventdata) self.aT.reset_gui_callback(init_fn, hObject, eventdata);
+            stop_callback = @(hObject, eventdata) stop(self.aT.gui_timer);
+            sample_callback = @(hObject, eventdata) self.aT.sample_gui_callback(step_fn, hObject, eventdata);
 
-            Rtot = state.Rtot;
-            path = state.path;
+            self.aT.gui_timer = timer('Period', 0.1, 'TimerFcn', step_callback, 'ExecutionMode', 'fixedRate', 'TasksToExecute', 1000000);
+			uicontrol('Style', 'pushbutton', 'String', 'Start', ...
+			  		 'Position', [10 90 70 20], ...
+			  		 'Callback', start_callback);
+			uicontrol('Style', 'pushbutton', 'String', 'Stop', ...
+					 'Position', [10 70 70 20], ...
+					 'Callback', stop_callback);
+			uicontrol('Style', 'pushbutton', 'String', 'Reset', ...
+					 'Position', [10 50 70 20], ...
+					 'Callback', reset_callback);
+			uicontrol('Style', 'pushbutton', 'String', 'Step', ...
+			  		 'Position', [10 30 70 20], ...
+			  		 'Callback', step_callback);
+			uicontrol('Style', 'pushbutton', 'String', 'Skip', ...
+					 'Position', [10 10 70 20], ...
+					 'Callback', sample_callback);
         end
 
+        % TODO Dedupe with TD.m
+        function step_gui_callback(self, step_fn, hObject, eventdata)
+            if self.aT.gui_state.done
+                return
+            end
+
+            % See if we're about to execute an option
+            % and visualize it nicely
+            %
+            s = self.aT.gui_state.s; 
+            a = self.aT.gui_state.a; 
+            if ismember(a, self.O)
+                o = find(self.O == a);
+                fprintf('  ...executing action %d = option %d, from state %d', a, o, s);
+                self.T{o}.sampleGPI_gui(s);
+            end
+
+            self.aT.step_gui_callback(step_fn, hObject, eventdata);
+        end
     end
 end

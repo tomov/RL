@@ -200,5 +200,5 @@ map = [
     'S#X..';
     '0.S.0'];
 O = Options(map);
-O.sampleQ();
+O.sampleQ(find(map == 'X'), true);
 

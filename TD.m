@@ -242,9 +242,9 @@ classdef TD < handle
             self.sample_gui_helper(@self.init_sampleGPI, @self.stepGPI, varargin{2:end});
         end
 
-        function res = sampleGPI(varargin)
+        function [Rtot, path] = sampleGPI(varargin)
             self = varargin{1};
-            res = self.sample_helper(@self.init_sampleGPI, @self.stepGPI, varargin{2:end});
+            [Rtot, path] = self.sample_helper(@self.init_sampleGPI, @self.stepGPI, varargin{2:end});
         end
 
         function state = init_sampleGPI(self, s)
@@ -294,9 +294,9 @@ classdef TD < handle
         % Run an episode and update Q-values using SARSA
         %
 
-        function res = sampleSARSA(varargin)
+        function [Rtot, path] = sampleSARSA(varargin)
             self = varargin{1};
-            res = self.sample_helper(@self.init_sampleSARSA, @self.stepSARSA, varargin{2:end});
+            [Rtot, path] = self.sample_helper(@self.init_sampleSARSA, @self.stepSARSA, varargin{2:end});
         end
 
         function sampleSARSA_gui(varargin)
@@ -358,9 +358,9 @@ classdef TD < handle
         % Run an episode and update Q-values using Q-learning
         %
 
-        function res = sampleQ(varargin)
+        function [Rtot, path] = sampleQ(varargin)
             self = varargin{1};
-            res = self.sample_helper(@self.init_sampleQ, @self.stepQ, varargin{2:end});
+            [Rtot, path] = self.sample_helper(@self.init_sampleQ, @self.stepQ, varargin{2:end});
         end
 
         function sampleQ_gui(varargin)
@@ -427,9 +427,9 @@ classdef TD < handle
             self.sample_gui_helper(@self.init_sampleAC, @self.stepAC, varargin{2:end});
         end
 
-        function res = sampleAC(varargin)
+        function [Rtot, path] = sampleAC(varargin)
             self = varargin{1};
-            res = self.sample_helper(@self.init_sampleAC, @self.stepAC, varargin{2:end});
+            [Rtot, path] = self.sample_helper(@self.init_sampleAC, @self.stepAC, varargin{2:end});
         end
 
         function state = init_sampleAC(self, s)
@@ -625,7 +625,7 @@ classdef TD < handle
 
             % plot map and transition probability across all possible actions, P(.|s)
             %
-            subplot(1, 4, 3);
+            subplot(1, 4, 4);
             pi = self.gui_state.pi';
             p = squeeze(self.P(self.I, self.gui_state.s, :));
             p = p * pi;

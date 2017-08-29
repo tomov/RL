@@ -98,75 +98,133 @@ classdef Options < handle
             self.aT = T;
         end 
 
-        % Run an episode and update Q-values using Q-learning
-        % TODO dedupe with sampleQ for TD learner
         %
-        function [Rtot, path] = sampleQ(self, s)
+        % Run an episode and update Q-values using Q-learning
+        % TODO dedupe with TD
+        %
+
+        function res = sampleQ(varargin)
+            self = varargin{1};
+            res = self.sample_helper(@self.init_sampleQ, @self.stepQ, varargin{2:end});
+        end
+
+        function state = init_sampleQ(self, s)
             if ~exist('s', 'var')
                 s = find(self.aT.map == self.aT.agent_symbol);
             end
             assert(numel(find(self.aT.I == s)) == 1);
 
-            Rtot = 0;
-            path = [];
+            state.Rtot = 0;
+            state.path = [];
+            state.s = s;
+            pi = self.aT.eps_greedy(s);
+            state.pi = pi;
+            state.a = samplePF(pi);
+            state.done = false;
+            state.method = 'Q';
+            state.r = 0;
+            state.pe = 0;
+        end
 
-            map = self.aT.map;
-            disp(map);
-            while true
-                Rtot = Rtot + self.aT.R(s);
-                path = [path, s];
+        function state = stepQ(self, state)
+            s = state.s;
+            a = state.a;
 
-                [x, y] = self.aT.I2pos(s);
-            
-                a = NaN;
-                while isnan(a) || max(self.aT.P(:,s,a)) == 0 % this means the action is not allowed; we could be more explicit about this TODO
-                    a = self.aT.eps_greedy(s);
-                end
-                new_s = samplePF(self.aT.P(:,s,a));
-            
-                oldQ = self.aT.Q(s,a); % for debugging
-                if ismember(a, self.O)
-                    % option -> execute optioopolicy until the end
-                    %
-                    o = find(self.O == a);
-                    [~, option_path] = self.T{o}.sampleGPI(s); % execute option policy
-                    option_path = option_path(2:end-1); % don't count s and fake B state
-                    k = numel(option_path);
-                    assert(k > 0); % b/c can't take an option from its goal state
-                    r = self.aT.R(option_path) .* TD.gamma .^ (0:k-1)'; % from Sec 3.2 of Sutton (1999)
-                    fprintf('       option! %d -> path = %s, r = %s\n', o, sprintf('%d ', option_path), sprintf('%.2f ', r));
-                    pe = sum(r) + (TD.gamma ^ k) * max(self.aT.Q(new_s, :)) - self.aT.Q(s, a);
-                else
-                    % primitive action -> regular Q learning
-                    %
-                    pe = self.aT.R(new_s) + TD.gamma * max(self.aT.Q(new_s, :)) - self.aT.Q(s, a);
-                end
+            state.Rtot = state.Rtot + self.aT.R(s);
+            state.path = [state.path, s];
 
-                self.aT.Q(s,a) = self.aT.Q(s,a) + self.aT.alpha * pe;
-                
-                if ismember(new_s, self.aT.B)
-                    % Boundary state
-                    %
-                    fprintf('(%d, %d), %d --> END [%.2f%%], old Q = %.2f, pe = %.2f, Q = %.2f\n', x, y, a, self.aT.P(new_s, s, a) * 100, oldQ, pe, self.aT.Q(s, a));
+            % Sample new state and new action
+            %
+            new_s = samplePF(self.aT.P(:,s,a));
+            pi = self.aT.eps_greedy(s);
+            new_a = NaN;
+            while isnan(new_a) || max(self.aT.P(:, new_s, new_a)) == 0 % this means the action is not allowed; we could be more explicit about this TODO
+                new_a = samplePF(pi);
+            end
+           
+            % Compute PE
+            %
+            oldQ = self.aT.Q(s,a); % for debugging
+            if ismember(a, self.O)
+                % option -> execute option policy until the end
+                %
+                o = find(self.O == a);
+                [~, option_path] = self.T{o}.sampleGPI(s); % execute option policy
+                option_path = option_path(2:end-1); % don't count s and fake B state
+                k = numel(option_path);
+                assert(k > 0); % b/c can't take an option from its goal state
 
-                    Rtot = Rtot + self.aT.R(new_s);
-                    path = [path, new_s];
-                    break;
-                end
+                r = self.aT.R(option_path) .* TD.gamma .^ (0:k-1)'; % from Sec 3.2 of Sutton (1999)
+                fprintf('       option! %d -> path = %s, r = %s\n', o, sprintf('%d ', option_path), sprintf('%.2f ', r));
+                r = sum(r);
+                pe = sum(r) + (TD.gamma ^ k) * max(self.aT.Q(new_s, :)) - self.aT.Q(s, a);
+            else
+                % primitive action -> regular Q learning
+                %
+                r = self.aT.R(new_s);
+                pe = r + TD.gamma * max(self.aT.Q(new_s, :)) - self.aT.Q(s, a);
+            end
 
+            % Update Q values
+            %
+            self.aT.Q(s,a) = self.aT.Q(s,a) + self.aT.alpha * pe;
+               
+            % Check for boundary conditions
+            %
+            if ismember(new_s, self.aT.B)
+                % Boundary state
+                %
+                state.Rtot = state.Rtot + self.aT.R(new_s);
+                state.path = [state.path, new_s];
+                state.done = true;
+            else
                 % Internal state
                 %
-                [new_x, new_y] = self.aT.I2pos(new_s);
-                
-                map(x, y) = self.aT.empty_symbol;
-                map(new_x, new_y) = self.aT.agent_symbol;
-                
-                fprintf('(%d, %d), %d --> (%d, %d) [%.2f%%], old Q = %.2f, pe = %.2f, Q = %.2f\n', x, y, a, new_x, new_y, self.aT.P(new_s, s, a) * 100, oldQ, pe, self.aT.Q(s, a));
-                disp(map);
-                
-                s = new_s;
+                state.s = new_s;
+                state.a = new_a;
+                state.r = r;
+                state.pe = pe;
+                state.pi = pi;
             end
-            fprintf('Total reward: %d\n', Rtot);
         end
+
+        % Generic function that samples paths given a state initializer and a step function
+        % TODO dedupe with TD.m it's exactly the same...
+        %
+        function [Rtot, path] = sample_helper(self, init_fn, step_fn, s, do_print)
+            if ~exist('s', 'var')
+                state = init_fn();
+            else
+                state = init_fn(s);
+            end
+            if ~exist('do_print', 'var')
+                do_print = false;
+            end
+
+            map = self.map;
+            if do_print, disp(map); end
+            while ~state.done
+                [x, y] = self.aT.I2pos(state.s);
+                old_s = state.s;
+                old_a = state.a;
+               
+                state = step_fn(state); 
+
+                if state.done
+                    if do_print, fprintf('(%d, %d), %d --> END [%.2f%%]\n', x, y, old_a, self.aT.P(state.s, old_s, old_a) * 100); end
+                else
+                    [new_x, new_y] = self.aT.I2pos(state.s);
+                    map(x, y) = TD.empty_symbol;
+                    map(new_x, new_y) = TD.agent_symbol;
+                    if do_print, fprintf('(%d, %d), %d --> (%d, %d) [%.2f%%]\n', x, y, old_a, new_x, new_y, self.aT.P(state.s, old_s, old_a) * 100); end
+                    if do_print, disp(map); end
+                end
+            end
+            if do_print, fprintf('Total reward: %d\n', state.Rtot); end
+
+            Rtot = state.Rtot;
+            path = state.path;
+        end
+
     end
 end

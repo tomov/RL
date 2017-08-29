@@ -195,7 +195,7 @@ classdef Options < handle
 
             % for GUI
             %
-            state.in_option = ismember(new_s, self.O);
+            state.in_option = ismember(new_a, self.O);
         end
 
         %

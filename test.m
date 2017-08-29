@@ -222,6 +222,7 @@ map = [
     '.0S....S#..';
     '.....#..$..'];
 O = Options(map);
-O.sampleQ(find(map == 'X'), true);
+%O.sampleQ(find(map == 'X'), true);
+%O.sampleQ();
 O.sampleQ_gui();
 

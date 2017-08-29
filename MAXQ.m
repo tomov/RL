@@ -65,11 +65,13 @@ classdef MAXQ < handle
                 max_node.B = setdiff(mdp.S, max_node.I); % boundary "terminated" states (T in the paper)
                 max_node.V = zeros(numel(mdp.S), 1); % Vi(s) from paper
       
-                % create children q-nodes == the primitive actions
+                % create children q-nodes == the primitive actions.
+                % they are parents of the primitve action max nodes
                 max_node.children = [];
                 for i = mdp.A
                     q_node = struct;
                     q_node.child = i; % max node i
+                    q_node.layer = 0.5;
                     q_node.name = ['QAction ', num2str(i)];
                     q_node.C = zeros(numel(mdp.S), 1); % Ci(s,a) from paper. Notice that i and a are specified by the q_node
                     q_node.Q = zeros(numel(mdp.S), 1); % Qi(s,a) from paper
@@ -99,6 +101,7 @@ classdef MAXQ < handle
                     assert(~m.is_primitive);
                     q_node = struct;
                     q_node.child = i;
+                    q_node.layer = 1.5;
                     q_node.name = ['QSubtask ', m.name(end)];
                     q_node.C = zeros(numel(mdp.S), 1); % Ci(s,a) from paper. Notice that i and a are specified by the q_node
                     q_node.Q = zeros(numel(mdp.S), 1); % Qi(s,a) from paper
@@ -317,6 +320,56 @@ classdef MAXQ < handle
             end
             p = eps_greedy(Q, MDP.eps);
             fprintf('   glie for %s: %s (p = %s)\n', max_node.name, sprintf('%.2f ', Q), sprintf('%.2f ', p));
+        end
+
+
+        function plot_gui(self)
+            figure;
+
+            n = 5;
+            l = 0;
+            for layer = 2:-1:0
+                max_nodes = {};
+                for i = 1:numel(self.Max_nodes)
+                    if self.Max_nodes{i}.layer == layer
+                        max_nodes = [max_nodes, self.Max_nodes{i}];
+                    end
+                end
+
+                m = numel(max_nodes);
+                l = l + 1;
+                for i = 1:m
+                    max_node = max_nodes{i};
+                    subplot(n, m, i + (l-1)*m);
+                    vi = max_node.V(self.mdp.I);
+                    imagesc(reshape(vi, size(self.map)));
+                    ylabel('V(s)');
+                    title(max_node.name);
+                end
+
+                if layer == 0
+                    break;
+                end
+                layer = layer - 0.5; % the Q nodes
+
+                q_nodes = {};
+                for i = 1:numel(self.Q_nodes)
+                    if abs(self.Q_nodes{i}.layer - layer) < 1e-8
+                        q_nodes = [q_nodes, self.Q_nodes{i}];
+                    end
+                end
+
+                m = numel(q_nodes);
+                l = l + 1;
+                for i = 1:m
+                    q_node = q_nodes{i};
+                    subplot(n, m, i + (l-1)*m);
+                    qi = q_node.Q(self.mdp.I);
+                    imagesc(reshape(qi, size(self.map)));
+                    ylabel('Q(s,a)');
+                    title(q_node.name);
+                end
+            end
         end
 
     end

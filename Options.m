@@ -128,6 +128,7 @@ classdef Options < handle
             state.method = 'Q';
             state.r = 0;
             state.pe = 0;
+            state.in_option = ismember(state.a, self.O); % for GUI
         end
 
         function state = stepQ(self, state)
@@ -140,7 +141,7 @@ classdef Options < handle
             % Sample new state and new action
             %
             new_s = samplePF(self.aT.P(:,s,a));
-            pi = self.aT.eps_greedy(s);
+            pi = self.aT.eps_greedy(new_s);
             new_a = NaN;
             while isnan(new_a) || max(self.aT.P(:, new_s, new_a)) == 0 % this means the action is not allowed; we could be more explicit about this TODO
                 new_a = samplePF(pi);
@@ -173,7 +174,7 @@ classdef Options < handle
             % Update Q values
             %
             self.aT.Q(s,a) = self.aT.Q(s,a) + self.aT.alpha * pe;
-               
+
             % Check for boundary conditions
             %
             if ismember(new_s, self.aT.B)
@@ -191,6 +192,10 @@ classdef Options < handle
                 state.pe = pe;
                 state.pi = pi;
             end
+
+            % for GUI
+            %
+            state.in_option = ismember(new_s, self.O);
         end
 
         %
@@ -242,14 +247,16 @@ classdef Options < handle
             % and visualize it nicely
             %
             s = self.aT.gui_state.s; 
-            a = self.aT.gui_state.a; 
-            if ismember(a, self.O)
+            a = self.aT.gui_state.a;
+            if self.aT.gui_state.in_option
+                assert(ismember(a, self.O));
+                self.aT.gui_state.in_option = false; % next time just move on
                 o = find(self.O == a);
                 fprintf('  ...executing action %d = option %d, from state %d', a, o, s);
                 self.T{o}.sampleGPI_gui(s);
+            else
+                self.aT.step_gui_callback(step_fn, hObject, eventdata);
             end
-
-            self.aT.step_gui_callback(step_fn, hObject, eventdata);
         end
     end
 end

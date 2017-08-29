@@ -201,6 +201,27 @@ map = [
     '..S..'];
 O = Options(map);
 O.sampleQ(find(map == 'X'), true);
+O.sampleQ_gui();
 
+
+%% Big options framework
+%
+
+fprintf('\n\n\n\n\n\n\n\n--------------------------------- big options framework ----------------------------------\n\n\n\n\n\n\n');
+
+map = [
+    'SX...#.....';
+    '.....#.....';
+    '..#S.......';
+    '.#...#.S##.';
+    '.....#...0.';
+    '#.####.....';
+    '.....###.##';
+    '..#..#...S.';
+    '..#..#.....';
+    '.0S....S#..';
+    '.....#..$..'];
+O = Options(map);
+O.sampleQ(find(map == 'X'), true);
 O.sampleQ_gui();
 

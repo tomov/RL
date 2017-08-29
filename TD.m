@@ -273,7 +273,7 @@ classdef TD < handle
             new_s = samplePF(self.P(:, s, a));
             new_a = self.pi(new_s);
             pi = zeros(size(self.A));
-            pi(a) = 1;
+            pi(new_a) = 1;
 
             if ismember(new_s, self.B)
                 % Boundary state

@@ -201,31 +201,30 @@ H.sample_gui();
 
 fprintf('\n\n\n---------- TD(0) learning ------------\n\n\n');
 
-
-T = MDP([
+map = [
     '$####';
     '.#X..';
-    '.....']);
-
-
-for i = 1:20
-    T.sampleSARSA(find(map == 'X'), true);
-end
-T.sampleSARSA_gui();
+    '.....'];
+M = MDP(map);
 
 for i = 1:20
-    T.sampleQ(find(map == 'X'), true);
+    M.sampleSARSA(find(map == 'X'), true);
 end
-T.sampleQ_gui();
+M.sampleSARSA_gui();
 
 for i = 1:20
-    T.sampleAC(find(map == 'X'), true);
+    M.sampleQ(find(map == 'X'), true);
 end
-T.sampleAC_gui();
+M.sampleQ_gui();
 
-T.solveGPI();
-T.sampleGPI();
-T.sampleGPI_gui();
+for i = 1:20
+    M.sampleAC(find(map == 'X'), true);
+end
+M.sampleAC_gui();
+
+M.solveGPI();
+M.sampleGPI();
+M.sampleGPI_gui();
 
 
 %% Options framework
@@ -291,5 +290,6 @@ map = [
     'B#AAA';
     'BBAAA'];
 M = MAXQ(map);
+M.maxQQ(11);
 %M.sampleQ(find(map == 'X'), true);
 %M.sampleQ_gui();

@@ -139,7 +139,7 @@ classdef SMDP < handle
             state.pi = pi;
             state.a = samplePF(pi);
             state.done = false;
-            state.method = 'Q';
+            state.method = 'Options-Q';
             state.r = 0;
             state.pe = 0;
             state.in_option = ismember(state.a, self.O); % for GUI
@@ -204,7 +204,7 @@ classdef SMDP < handle
 
             % Update Q values
             %
-            self.mdp.Q(s,a) = self.mdp.Q(s,a) + self.mdp.alpha * pe;
+            self.mdp.Q(s,a) = self.mdp.Q(s,a) + MDP.alpha * pe;
 
             % Check for boundary conditions
             %

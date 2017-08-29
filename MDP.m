@@ -697,20 +697,7 @@ classdef MDP < handle
         % used for SARSA and Q-learning
         %
         function p = eps_greedy(self, s)
-            [~, a] = max(self.Q(s,:));
-            if numel(unique(self.Q(s,:))) == 1
-                % no max => choose at random
-                %
-                p = ones(size(self.A));
-                p = p / sum(p);
-            else
-                % return best action
-                % with small probability eps, return another action at random
-                %
-                p = ones(size(self.A)) * self.eps / (numel(self.A) - 1);
-                p(a) = 1 - self.eps;
-                assert(abs(sum(p) - 1) < 1e-8);
-            end
+            p = eps_greedy(self.Q(s,:), MDP.eps);
         end
 
         % Pick action a from state s using softmax based on H policy parameters

@@ -119,11 +119,6 @@ classdef MAXQ < handle
         % Run an episode and update V-values and Q-values using MAXQ-0-learning
         %
 
-        function sample0_gui(varargin)
-            self = varargin{1};
-            self.sample_gui_helper(@self.init_sample0, @self.step0, varargin{2:end}); % we're using the local one
-        end
-
         function res = sample0(varargin)
             self = varargin{1};
             res = self.mdp.sample_helper(@self.init_sample0, @self.step0, varargin{2:end});
@@ -131,91 +126,137 @@ classdef MAXQ < handle
 
         function stack = init_sample0(self, s)
             assert(numel(find(self.mdp.I == s)) == 1);
-
-            state.Rtot = 0;
-            state.path = [];
-            state.rs = [];
-            state.pes = [];
-            state.s = s;
-            state.pi = [1]; % dummy policy initially; can only choose 'root' Max node 
-            state.p = self.root; % subtask / subroutine = max node = 'action'
-            state.done = false;
-            state.method = 'MAXQ-0';
-            state.r = 0;
-            state.pe = 0;
-
+            state = self.init_state0(s, self.root);
             stack = [state]; % we're unrolling the recursion baby
         end
+
+        function state = init_state0(self, s, p)
+            state.Rtot = 0;
+            state.path = [];
+            state.s = s;
+            state.p = p; % subtask / subroutine = max node = 'action'
+            state.done = false; % have we reached a terminal state?
+            state.method = 'MAXQ-0';
+
+            state.second_half = false; % whether we're coming back from the recursion
+            state.r = 0; % as returned from the lower layer
+            state.new_s = 0; % as returned from the lower layer
+            state.a = -1; % chosen action = max node
+            state.pa = -1; % q node = parent of chosen action
+        end
         
-        function stack = step0(stack)
-            r = NaN;
+        function stack = step0(self, stack)
+            spaces = repmat(' ', 1, numel(stack) * 5);
 
-            %
-            %
-            while stack(end).done
-                % Return values from lower level (which has terminated)
+            state = stack(end);
+            s = state.s;
+            p = state.p;
+
+            max_node = self.Max_nodes{p};
+            q_children = max_node.children;
+            q_nodes = [self.Q_nodes{q_children}];
+            max_children = [q_nodes.child]; % max children of the current max node (subroutine) p
+
+            if ~state.second_half
+                % Do the regular loop from maxQQ
+                % up to calling maxQQ recursively, or executing a primitive action
                 %
-                r = stack(end).Rtot;
-                new_s = stack(end).new_s;
 
-                % Pop the lower level from the stack
+                % Choose action / subroutine a
                 %
-                stack = stack(1:end-1);
-                
-                % Now see what's up on the current level
+                pi = self.glie(s, p);
+                j = samplePF(pi);
+                pa = q_children(j);
+                a = max_children(j);
+                stack(end).a = a;
+                stack(end).pa = pa;
+
+                fprintf('\n\n\n%s At maxQQ(%d, %d), executing a = %d (pa = %d, pi = %s, q children = %s, max children = %s)\n', spaces, s, p, a, pa, sprintf('%.2f ', pi), sprintf('%d ', q_children), sprintf('%d ', max_children));
+                disp(max_node);
+
+                % Execute a
                 %
-                state = stack(end);
+                if self.Max_nodes{a}.is_primitive
+                    % If a is primitive, get reward r and new state s' from low-level MDP
+                    %
+                    new_s = samplePF(self.mdp.P(:,s,a));
+                    r = self.mdp.R(new_s);
 
-                s = state.s; % the current state
-                a = state.a; % the chosen action
-                p = state.p; % the current subroutine
+                    % Update Vi(s) for primitive node here (b/c we don't call maxQQ on it)
+                    %
+                    pe = r - self.Max_nodes{a}.V(s); % Eq 11: PE = R(s') - Vi(s)
+                    self.Max_nodes{a}.V(s) = self.Max_nodes{a}.V(s) + MDP.alpha * pe; % Eq 11: Vi(s) = Vi(s) + alpha * PE
+                    
+                    fprintf('%s       Primitive action -> new_s = %d, r = %.2f, Rtot = %.2f, pe = %.2f, V(a,s) = %.2f\n', spaces, new_s, r, stack(end).Rtot, pe, self.Max_nodes{a}.V(s));
 
-                state.Rtot = state.Rtot + r;
-                state.path = [state.path, s];
-
-                max_node = self.Max_nodes(a);
-                if max_node.is_primitive
-                    self.Max_nodes(a).V(s) = self.Max_nodes(a).V(s) + MDP.alpha * r;
+                    stack(end).new_s = new_s;
+                    stack(end).r = r;
+                    stack(end).second_half = true; % tell caller to move on
+                    stack(end).done = true; % primitive actions terminate immediately
                 else
-                    V = [];
-                    C = [];
-                    for j = 1:numel(max_node.children)
-                        q_node = self.Q_nodes(max_node.children(j));
-                        %C = 
-                    end
-                    %pe = max(self.Max_nodes(p).V(new_s), );
-                    self.Q_nodes(a).C(s) = self.Q_nodes(a).C(s) + MDP.alpha * pe;
+                    % a is a subroutine -> find reward r and new state s' recursively from children
+                    %
+                    fprintf('%s Complex action -> calling maxQQ(%d, %d)\n', spaces, s, a);
+
+                    state = self.init_state0(s, a);
+                    stack = [stack, state];
+                    %[r, new_s] = self.maxQQ(s, a);
                 end
 
-                % ??
-                state.new_s = new_s;
-
-                stack(end) = state;
-            end
-
-            max_node = self.Max_nodes(a);
-
-            state.Rtot = state.Rtot + self.mdp.R(s);
-            state.path = [state.path, s];
-
-            fprintf('At state (%d, %d) [stack %s]: max_node\n', s, a, sprintf('%d ', [stack.a]));
-            disp(max_node);
-
-            if max_node.is_primitive
-                fprintf('        primitive %d\n', a);
-
-                new_s = samplePF(self.mdp.P(:,s,a));
-                %pi = [1];
-                %new_a = self.root; % back to root
-
-                r = self.mdp.R(s);
-                state.Rtot = state.Rtot + r;
-
-                % TODO update -- roll back the recursion
-
             else
-                fprintf('        composite %d\n', a);
+                % Do the second half of the recursion
+                %
 
+                % get locals from stack
+                %
+                a = stack(end).a;
+                pa = stack(end).pa;
+                new_s = stack(end).new_s;
+
+                fprintf('%s ...back to maxQQ(%d, %d) after calling maxQQ(%d, %d): new_s = %d, r = %.2f\n', spaces, s, p, s, a, new_s, stack(end).r);
+
+                % Update total reward
+                %
+                stack(end).Rtot = stack(end).Rtot + stack(end).r;
+                stack(end).path = [stack(end).path, new_s];
+
+                % Update Ci(s, a)
+                %
+                pe = self.Max_nodes{p}.V(new_s) - self.Q_nodes{pa}.C(s); % Eq 10: PE = Vi(s') - Ci(s,a)
+                self.Q_nodes{pa}.C(s) = self.Q_nodes{pa}.C(s) + MDP.alpha * pe; % Eq 10: Ci(s,a) = Ci(s,a) + alpha * PE
+                self.Q_nodes{pa}.Q(s) = self.Q_nodes{pa}.C(s) + self.Max_nodes{a}.V(s); % Eq 7: Qi(s,a) = Ci(s,a) + Va(s)
+
+                Q = [];
+                for j = 1:numel(max_children)
+                    Q = [Q, self.Q_nodes{q_children(j)}.Q(s)]; % Qi(s,a)
+                end
+                self.Max_nodes{p}.V(s) = max(Q); % Eq 8: Vi(s) = max Qi(s,:)
+
+                fprintf('%s Qs = [%s], pe = %.2f, C(p,s,a) = %.2f, V(p,s) = %.2f\n', spaces, sprintf('%.2f ', Q), pe, self.Q_nodes{pa}.C(s), self.Max_nodes{p}.V(s));
+
+                if stack(end).done || ismember(new_s, self.Max_nodes{p}.B)
+                    % Boundary state
+                    %
+                    fprintf('%s DONE!\n', spaces);
+
+                    if numel(stack) > 1
+                        % pass results back up the stack, if we're not root
+                        %
+                        stack(end-1).r = stack(end).Rtot;
+                        stack(end-1).new_s = stack(end).new_s;
+                        stack(end-1).second_half = true; % tell caller to move on
+                        stack = stack(1:end-1);
+                    else
+                        % we're finished -> nothing to pop
+                        %
+                        stack(1).done = true;
+                    end
+                else
+                    % Internal state -> we keep going
+                    %
+                    stack(end).s = new_s;
+                    stack(end).second_half = false;
+                end
             end
         end
 
@@ -240,7 +281,6 @@ classdef MAXQ < handle
                 pa = q_children(j);
                 a = max_children(j);
 
-                save shit.mat;
                 fprintf('\n\n\n%s At maxQQ(%d, %d), executing a = %d (pa = %d, pi = %s, q children = %s, max children = %s)\n', spaces, s, p, a, pa, sprintf('%.2f ', pi), sprintf('%d ', q_children), sprintf('%d ', max_children));
                 disp(max_node);
 
@@ -275,16 +315,6 @@ classdef MAXQ < handle
 
                 % Update Ci(s, a)
                 %
-                %{
-                V = [];
-                C = [];
-                for j = 1:numel(max_children)
-                    V = [V, self.Max_nodes{max_children(j)}.V(new_s)]; % V(a', s')
-                    C = [C, self.Q_nodes{q_children(j)}.C(new_s)]; % C(p, s', a')
-                end
-                pe = self.Q_nodes{pa}.C(s) - max(V + C);
-                self.Q_nodes{pa}.C(s) = self.Q_nodes{pa}.C(s) + MDP.alpha * pe;
-                %}
                 pe = self.Max_nodes{p}.V(new_s) - self.Q_nodes{pa}.C(s); % Eq 10: PE = Vi(s') - Ci(s,a)
                 self.Q_nodes{pa}.C(s) = self.Q_nodes{pa}.C(s) + MDP.alpha * pe; % Eq 10: Ci(s,a) = Ci(s,a) + alpha * PE
                 self.Q_nodes{pa}.Q(s) = self.Q_nodes{pa}.C(s) + self.Max_nodes{a}.V(s); % Eq 7: Qi(s,a) = Ci(s,a) + Va(s)

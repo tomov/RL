@@ -290,7 +290,8 @@ map = [
     'B#AAA';
     'BBAAA'];
 M = MAXQ(map);
-M.maxQQ(11);
+%M.maxQQ(11);
+M.sample0(11);
 M.plot_gui();
 %M.sampleQ(find(map == 'X'), true);
 %M.sampleQ_gui();

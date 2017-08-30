@@ -291,7 +291,6 @@ map = [
     'BBAAA'];
 M = MAXQ(map);
 %M.maxQQ(11);
-M.sample0(11);
-M.plot_gui();
+M.sample0_gui(11);
 %M.sampleQ(find(map == 'X'), true);
 %M.sampleQ_gui();

@@ -44,6 +44,7 @@ classdef MAXQ < handle
                 max_node = struct;
                 max_node.is_primitive = true;
                 max_node.a = a;
+                max_node.p = a;
                 max_node.layer = 0;
                 max_node.name = ['MaxAction ', num2str(a)];
                 max_node.V = zeros(numel(mdp.S), 1); % Vi(s) from paper
@@ -60,6 +61,7 @@ classdef MAXQ < handle
                 max_node = struct;
                 max_node.is_primitive = false;
                 max_node.layer = 1;
+                max_node.p = numel(self.Max_nodes) + 1;
                 max_node.name = ['MaxSubtask ', c];
                 max_node.I = subtask_inds'; % internal "active" states (S in the paper) = all states labeled for the subtask
                 max_node.B = setdiff(mdp.S, max_node.I); % boundary "terminated" states (T in the paper)
@@ -70,8 +72,10 @@ classdef MAXQ < handle
                 max_node.children = [];
                 for i = mdp.A
                     q_node = struct;
-                    q_node.child = i; % max node i
+                    q_node.a = i; % child = primitive action i
                     q_node.layer = 0.5;
+                    q_node.p = max_node.p;
+                    q_node.idx = numel(self.Q_nodes) + 1;
                     q_node.name = ['QAction ', num2str(i)];
                     q_node.C = zeros(numel(mdp.S), 1); % Ci(s,a) from paper. Notice that i and a are specified by the q_node
                     q_node.Q = zeros(numel(mdp.S), 1); % Qi(s,a) from paper
@@ -88,6 +92,7 @@ classdef MAXQ < handle
             max_node = struct;
             max_node.is_primitive = false;
             max_node.layer = 2;
+            max_node.p = numel(self.Max_nodes) + 1;
             max_node.name = ['MaxRoot'];
             max_node.I = mdp.I;
             max_node.B = mdp.B;
@@ -100,8 +105,10 @@ classdef MAXQ < handle
                 if m.layer == 1
                     assert(~m.is_primitive);
                     q_node = struct;
-                    q_node.child = i;
+                    q_node.a = i;
                     q_node.layer = 1.5;
+                    q_node.p = max_node.p;
+                    q_node.idx = numel(self.Q_nodes) + 1;
                     q_node.name = ['QSubtask ', m.name(end)];
                     q_node.C = zeros(numel(mdp.S), 1); % Ci(s,a) from paper. Notice that i and a are specified by the q_node
                     q_node.Q = zeros(numel(mdp.S), 1); % Qi(s,a) from paper
@@ -118,6 +125,11 @@ classdef MAXQ < handle
         %
         % Run an episode and update V-values and Q-values using MAXQ-0-learning
         %
+
+        function sample0_gui(varargin)
+            self = varargin{1};
+            self.sample_gui_helper(@self.init_sample0, @self.step0, varargin{2:end}); % we're using the local one
+        end
 
         function res = sample0(varargin)
             self = varargin{1};
@@ -155,7 +167,7 @@ classdef MAXQ < handle
             max_node = self.Max_nodes{p};
             q_children = max_node.children;
             q_nodes = [self.Q_nodes{q_children}];
-            max_children = [q_nodes.child]; % max children of the current max node (subroutine) p
+            max_children = [q_nodes.a]; % max children of the current max node (subroutine) p
 
             if ~state.second_half
                 % Do the regular loop from maxQQ
@@ -272,7 +284,7 @@ classdef MAXQ < handle
                 max_node = self.Max_nodes{p};
                 q_children = max_node.children;
                 q_nodes = [self.Q_nodes{q_children}];
-                max_children = [q_nodes.child]; % max children of the current max node (subroutine) p
+                max_children = [q_nodes.a]; % max children of the current max node (subroutine) p
 
                 % Choose action / subroutine a
                 %
@@ -353,8 +365,69 @@ classdef MAXQ < handle
         end
 
 
+        %
+        % Generic function that samples paths using a nice GUI
+        %
+
+        % TODO dedupe with MDP 
+        function sample_gui_helper(self, init_fn, step_fn, s)
+            self.mdp.gui_state = init_fn(s);
+			self.mdp.gui_map = figure;
+            self.plot_gui();
+
+            step_callback = @(hObject, eventdata) self.step_gui_callback(step_fn, hObject, eventdata);
+            start_callback = @(hObject, eventdata) self.mdp.start_gui_callback(hObject, eventdata);
+            reset_callback = @(hObject, eventdata) self.reset_gui_callback(init_fn, hObject, eventdata);
+            stop_callback = @(hObject, eventdata) stop(self.mdp.gui_timer);
+            sample_callback = @(hObject, eventdata) self.sample_gui_callback(step_fn, hObject, eventdata);
+
+            self.mdp.gui_timer = timer('Period', 0.5, 'TimerFcn', step_callback, 'ExecutionMode', 'fixedRate', 'TasksToExecute', 1000000);
+			uicontrol('Style', 'pushbutton', 'String', 'Start', ...
+			  		 'Position', [10 50 + 90 40 20], ...
+			  		 'Callback', start_callback);
+			uicontrol('Style', 'pushbutton', 'String', 'Stop', ...
+					 'Position', [10 50 + 70 40 20], ...
+					 'Callback', stop_callback);
+			uicontrol('Style', 'pushbutton', 'String', 'Reset', ...
+					 'Position', [10 50 + 50 40 20], ...
+					 'Callback', reset_callback);
+			uicontrol('Style', 'pushbutton', 'String', 'Step', ...
+			  		 'Position', [10 25 + 30 40 20], ...
+			  		 'Callback', step_callback);
+			uicontrol('Style', 'pushbutton', 'String', 'Skip', ...
+					 'Position', [10 10 40 20], ...
+					 'Callback', sample_callback);
+        end
+
+        function step_gui_callback(self, step_fn, hObject, eventdata)
+            if numel(self.mdp.gui_state) == 1 && self.mdp.gui_state.done
+                stop(self.mdp.gui_timer);
+                return
+            end
+
+            self.mdp.gui_state = step_fn(self.mdp.gui_state);
+            self.plot_gui();
+        end
+
+        function reset_gui_callback(self, init_fn, hObject, eventdata)
+            self.mdp.gui_state = init_fn(self.mdp.gui_state.path(1));
+            self.plot_gui();
+        end
+
+        function sample_gui_callback(self, step_fn, hObject, eventdata)
+            while numel(self.mdp.gui_state) > 1 || ~self.mdp.gui_state.done
+                self.mdp.gui_state = step_fn(self.mdp.gui_state);
+            end
+            self.plot_gui();
+        end
+
         function plot_gui(self)
-            figure;
+            figure(self.mdp.gui_map);
+            stack = self.mdp.gui_state;
+            state = stack(end);
+            [x, y] = ind2sub(size(self.map), state.s);
+
+            disp(state);
 
             n = 5;
             l = 0;
@@ -373,8 +446,15 @@ classdef MAXQ < handle
                     subplot(n, m, i + (l-1)*m);
                     vi = max_node.V(self.mdp.I);
                     imagesc(reshape(vi, size(self.map)));
-                    ylabel('V(s)');
-                    title(max_node.name);
+                    if max_node.p == state.a
+                        text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
+                    elseif max_node.p == state.p
+                        text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'white');
+                    elseif ismember(max_node.p, [stack.p])
+                        text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'black');
+                    end
+                    if i == 1, ylabel('V(s)'); end
+                    title(sprintf('%s (%d)', max_node.name, max_node.p));
                 end
 
                 if layer == 0
@@ -396,8 +476,13 @@ classdef MAXQ < handle
                     subplot(n, m, i + (l-1)*m);
                     qi = q_node.Q(self.mdp.I);
                     imagesc(reshape(qi, size(self.map)));
-                    ylabel('Q(s,a)');
-                    title(q_node.name);
+                    if q_node.a == state.a && q_node.p == state.p
+                        text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
+                    elseif find(q_node.a == [stack.a]) == find(q_node.p == [stack.p])
+                        text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'black');
+                    end
+                    if i == 1, ylabel('Q(s,a)'); end
+                    title(sprintf('%s (%d)', q_node.name, q_node.idx));
                 end
             end
         end

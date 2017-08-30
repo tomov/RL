@@ -619,7 +619,7 @@ classdef MDP < handle
         % Run entire episode until the end
         %
         function sample_gui_callback(self, step_fn, hObject, eventdata)
-            while ~self.gui_state.done
+            while numel(self.gui_state) > 1 || ~self.gui_state.done
                 self.gui_state = step_fn(self.gui_state);
             end
             self.plot_gui();
@@ -636,7 +636,7 @@ classdef MDP < handle
             vi = self.V(self.I);
             imagesc(reshape(vi, size(self.map)));
             [x, y] = ind2sub(size(self.map), self.gui_state.s);
-            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
+            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
             label = sprintf('Total reward: %.2f, steps: %d', self.gui_state.Rtot, numel(self.gui_state.path));
             if self.gui_state.done
                 xlabel(['FINISHED!: ', label]);
@@ -653,7 +653,7 @@ classdef MDP < handle
             qi = max(qi, [], 2);
             imagesc(reshape(qi, size(self.map)));
             [x, y] = ind2sub(size(self.map), self.gui_state.s);
-            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
+            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
             title('action-value function max_a Q(.,a)');
 
             % plot map and transition probability across all possible actions, P(.|s)
@@ -664,7 +664,7 @@ classdef MDP < handle
             p = p * pi;
             imagesc(reshape(p, size(self.map)));
             [x, y] = ind2sub(size(self.map), self.gui_state.s);
-            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
+            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
             title('policy P(.|s)');
 
             % plot map and current transition probability given the selected action, P(.|s,a)
@@ -673,7 +673,7 @@ classdef MDP < handle
             p = self.P(self.I, self.gui_state.s, self.gui_state.a);
             imagesc(reshape(p, size(self.map)));
             [x, y] = ind2sub(size(self.map), self.gui_state.s);
-            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
+            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
             title('transition probability for chosen action P(.|s,a)');
 
             % plot reward / PE history

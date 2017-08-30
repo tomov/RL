@@ -430,7 +430,7 @@ classdef HMLMDP < handle
             zi = self.M.z(self.M.I);
             imagesc(log(reshape(zi, size(self.M.map))));
             [x, y] = ind2sub(size(self.M.map), self.state_gui.s);
-            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
+            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
             if self.state_gui.done
                 xlabel(sprintf('FINISHED Total reward: %.2f', self.state_gui.Rtot));
             else
@@ -448,7 +448,7 @@ classdef HMLMDP < handle
                 wb = w;
             end
             imagesc(reshape(wb, size(self.M.map)));
-            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold');
+            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
             title('Boundary state weights w_b^1');
 
             % plot desirability f'n of basis tasks 

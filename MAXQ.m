@@ -5,10 +5,12 @@ classdef MAXQ < handle
 
     properties (Constant = true)
         R_I = -1; % penalty for remaining stationary. TODO dedupe with MDP.R_I 
+        R_illegal = -1; % penalty for trying to enter a subtask for which s is illegal TODO 
 
         % Maze
         %
-        subtask_symbols = 'ABCDEFGHIJKLMNOP';
+        goal_symbol = '$';
+        subtask_symbols = 'ABCDEFGHIJKLMNOP$';
     end
 
     properties (Access = public)
@@ -37,10 +39,13 @@ classdef MAXQ < handle
 
             % Create a base MDP for convenience
             %
+            goal_inds = find(map == MAXQ.goal_symbol);
             all_subtask_inds = find(ismember(map, MAXQ.subtask_symbols));
             map(all_subtask_inds) = MDP.empty_symbol; % remove all subtasks
+            map(goal_inds) = MAXQ.goal_symbol; % the goal is also interpreted as a subtask; TODO fixme
             mdp = MDP(map);
             self.mdp = mdp;
+            assert(numel(mdp.B) > 0); % make sure there's B states
 
             % Lowest layer of the hierarchy: max nodes == primitive actions
             %
@@ -49,6 +54,8 @@ classdef MAXQ < handle
                 max_node.is_primitive = true;
                 max_node.a = a;
                 max_node.p = a;
+                max_node.I = self.mdp.I;
+                max_node.B = self.mdp.B;
                 max_node.layer = 0;
                 max_node.name = ['MaxAction ', num2str(a)];
                 max_node.V = zeros(numel(mdp.S), 1); % Vi(s) from paper
@@ -172,27 +179,6 @@ classdef MAXQ < handle
             s = state.s;
             p = state.p;
 
-            %{
-            if ~self.Max_nodes{p}.is_primitive && (state.done || ismember(s, self.Max_nodes{p}.B))
-                % Someone called us with a boundary state -> return immediately
-                %
-                state
-                assert(~state.second_half);
-                if numel(stack) > 1
-                    % pass results back up the stack, if we're not root
-                    %
-                    stack(end-1).r = stack(end).Rtot;
-                    stack(end-1).new_s = stack(end).new_s;
-                    stack(end-1).second_half = true; % tell caller to move on
-                    stack = stack(1:end-1);
-                else
-                    % we're finished -> nothing to pop
-                    %
-                    stack(1).done = true;
-                end
-            end
-            %}
-
             max_node = self.Max_nodes{p};
             q_children = max_node.children;
             q_nodes = [self.Q_nodes{q_children}];
@@ -211,6 +197,7 @@ classdef MAXQ < handle
                 a = max_children(j);
                 stack(end).a = a;
                 stack(end).pa = pa;
+                stack(end).second_half = true; % caller must move on next time
 
                 fprintf('\n\n\n%s At maxQ0(%d, %d), executing a = %d (pa = %d, pi = %s, q children = %s, max children = %s)\n', spaces, s, p, a, pa, sprintf('%.2f ', pi), sprintf('%d ', q_children), sprintf('%d ', max_children));
                 disp(max_node);
@@ -228,20 +215,34 @@ classdef MAXQ < handle
                     pe = r - self.Max_nodes{a}.V(s); % Eq 11: PE = R(s') - Vi(s)
                     self.Max_nodes{a}.V(s) = self.Max_nodes{a}.V(s) + MDP.alpha * pe; % Eq 11: Vi(s) = Vi(s) + alpha * PE
                     
-                    fprintf('%s       Primitive action -> new_s = %d, r = %.2f, Rtot = %.2f, pe = %.2f, V(a,s) = %.2f\n', spaces, new_s, r, stack(end).Rtot, pe, self.Max_nodes{a}.V(s));
+                    fprintf('%s       Primitive action -> new_s = %d, r = %.2f, pe = %.2f, V(a,s) = %.2f\n', spaces, new_s, r, pe, self.Max_nodes{a}.V(s));
 
-                    stack(end).new_s = new_s;
+                    stack(end).new_s = new_s; % set up locals for second half of recursion
                     stack(end).r = r;
-                    stack(end).second_half = true; % tell caller to move on
-                    stack(end).done = true; % primitive actions terminate immediately
+
+                elseif ismember(s, self.Max_nodes{a}.B)
+                    % Illegal move to a subtask for which s is a boundary state
+                    % => penalize so we don't do it again
+                    % TODO is this okay? or even necessary?
+                    %
+                    new_s = s;
+                    r = MAXQ.R_illegal;
+
+                    pe = r - self.Max_nodes{a}.V(s); % Eq 11: PE = R(s') - Vi(s)
+                    self.Max_nodes{a}.V(s) = self.Max_nodes{a}.V(s) + MDP.alpha * pe; % Eq 11: Vi(s) = Vi(s) + alpha * PE
+
+                    fprintf('%s       Illegal action -> new_s = %d, r = %.2f, pe = %.2f, V(a,s) = %.2f\n', spaces, new_s, r, pe, self.Max_nodes{a}.V(s));
+
+                    stack(end).new_s = s;
+                    stack(end).r = r;
+
                 else
                     % a is a subroutine -> find reward r and new state s' recursively from children
                     %
                     fprintf('%s Complex action -> calling maxQ0(%d, %d)\n', spaces, s, a);
 
                     state = self.init_state0(s, a);
-                    stack = [stack, state];
-                    %[r, new_s] = self.maxQ0(s, a);
+                    stack = [stack, state]; % recurse -> put next call to maxQ0(s,a) on top of stack
                 end
 
             else
@@ -254,7 +255,7 @@ classdef MAXQ < handle
                 pa = stack(end).pa;
                 new_s = stack(end).new_s;
 
-               % assert(~ismember(s, self.Max_nodes{p}.B)); % cannot update a boundary state
+                assert(~ismember(s, self.Max_nodes{p}.B)); % cannot update a boundary state
 
                 fprintf('%s ...back to maxQ0(%d, %d) after calling maxQ0(%d, %d): new_s = %d, r = %.2f\n', spaces, s, p, s, a, new_s, stack(end).r);
 
@@ -275,7 +276,7 @@ classdef MAXQ < handle
                 end
                 self.Max_nodes{p}.V(s) = max(Q); % Eq 8: Vi(s) = max Qi(s,:)
 
-                fprintf('%s Qs = [%s], pe = %.2f, C(p,s,a) = %.2f, V(p,s) = %.2f\n', spaces, sprintf('%.2f ', Q), pe, self.Q_nodes{pa}.C(s), self.Max_nodes{p}.V(s));
+                fprintf('%s Qs = [%s], pe = %.2f, C(p,s,a) = %.2f, V(p,s) = %.2f, Rtot = %.2f\n', spaces, sprintf('%.2f ', Q), pe, self.Q_nodes{pa}.C(s), self.Max_nodes{p}.V(s), stack(end).Rtot);
 
                 if stack(end).done || ismember(new_s, self.Max_nodes{p}.B)
                     % Boundary state
@@ -298,10 +299,13 @@ classdef MAXQ < handle
                     % Internal state -> we keep going
                     %
                     stack(end).s = new_s;
-                    stack(end).second_half = false;
+                    stack(end).second_half = false; % repeat the for-loop
                 end
             end
         end
+
+
+
 
         % Recursive MaxQ-0
         %
@@ -312,12 +316,7 @@ classdef MAXQ < handle
             spaces = repmat(' ', 1, (2 - self.Max_nodes{p}.layer) * 5);
             
             Rtot = 0;
-            new_s = s;
             done = false;
-
-            if ismember(s, self.Max_nodes{p}.B) % edge case
-                return
-            end
 
             while ~done
                 max_node = self.Max_nodes{p};
@@ -348,7 +347,19 @@ classdef MAXQ < handle
                     pe = r - self.Max_nodes{a}.V(s); % Eq 11: PE = R(s') - Vi(s)
                     self.Max_nodes{a}.V(s) = self.Max_nodes{a}.V(s) + MDP.alpha * pe; % Eq 11: Vi(s) = Vi(s) + alpha * PE
                     
-                    fprintf('%s       Primitive action -> new_s = %d, r = %.2f, Rtot = %.2f, pe = %.2f, V(a,s) = %.2f\n', spaces, new_s, r, Rtot, pe, self.Max_nodes{a}.V(s));
+                    fprintf('%s       Primitive action -> new_s = %d, r = %.2f, pe = %.2f, V(a,s) = %.2f\n', spaces, new_s, r, pe, self.Max_nodes{a}.V(s));
+                elseif ismember(s, self.Max_nodes{a}.B)
+                    % Illegal move to a subtask for which s is a boundary state
+                    % => penalize so we don't do it again
+                    % TODO is this okay? or even necessary?
+                    %
+                    new_s = s;
+                    r = MAXQ.R_illegal;
+
+                    pe = r - self.Max_nodes{a}.V(s); % Eq 11: PE = R(s') - Vi(s)
+                    self.Max_nodes{a}.V(s) = self.Max_nodes{a}.V(s) + MDP.alpha * pe; % Eq 11: Vi(s) = Vi(s) + alpha * PE
+
+                    fprintf('%s       Illegal action -> new_s = %d, r = %.2f, pe = %.2f, V(a,s) = %.2f\n', spaces, new_s, r, pe, self.Max_nodes{a}.V(s));
 
                 else
                     % a is a subroutine -> find reward r and new state s' recursively from children
@@ -378,7 +389,7 @@ classdef MAXQ < handle
                 end
                 self.Max_nodes{p}.V(s) = max(Q); % Eq 8: Vi(s) = max Qi(s,:)
 
-                fprintf('%s Qs = [%s], pe = %.2f, C(p,s,a) = %.2f, V(p,s) = %.2f\n', spaces, sprintf('%.2f ', Q), pe, self.Q_nodes{pa}.C(s), self.Max_nodes{p}.V(s));
+                fprintf('%s Qs = [%s], pe = %.2f, C(p,s,a) = %.2f, V(p,s) = %.2f, Rtot = %.2f\n', spaces, sprintf('%.2f ', Q), pe, self.Q_nodes{pa}.C(s), self.Max_nodes{p}.V(s), Rtot);
 
                 if ismember(new_s, self.Max_nodes{p}.B)
                     % Boundary state
@@ -422,7 +433,7 @@ classdef MAXQ < handle
             stop_callback = @(hObject, eventdata) stop(self.mdp.gui_timer);
             sample_callback = @(hObject, eventdata) self.sample_gui_callback(step_fn, hObject, eventdata);
 
-            self.mdp.gui_timer = timer('Period', 0.5, 'TimerFcn', step_callback, 'ExecutionMode', 'fixedRate', 'TasksToExecute', 1000000);
+            self.mdp.gui_timer = timer('Period', 1, 'TimerFcn', step_callback, 'ExecutionMode', 'fixedRate', 'TasksToExecute', 1000000);
 			uicontrol('Style', 'pushbutton', 'String', 'Start', ...
 			  		 'Position', [10 50 + 90 40 20], ...
 			  		 'Callback', start_callback);
@@ -534,6 +545,7 @@ classdef MAXQ < handle
                 end
             end
 
+            axis on;
             label = sprintf('Total reward: %.2f, steps: %d', state.Rtot, numel(state.path));
             if state.done
                 xlabel(['FINISHED!: ', label]);

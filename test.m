@@ -1,5 +1,6 @@
-fprintf('\n\n\n----------  LMDP ------------\n\n\n');
 
+%{
+fprintf('\n\n\n----------  LMDP ------------\n\n\n');
 
 map = ['$####';
        '.#X..';
@@ -30,6 +31,7 @@ M.sample();
 
 %% augmented MLMDP
 %
+
 fprintf('\n\n\n--------- AMLMDP -----------\n\n\n');
 
 
@@ -44,22 +46,29 @@ A.sample();
 
 A.solveMLMDP([-1 -1 -1 -1 10]');
 A.sample();
-
+%}
 
 %% HMLMDP
 %
 
 fprintf('\n\n\n\n\n\n\n\n--------------------------------- HMLMDP ----------------------------------\n\n\n\n\n\n\n');
 
+%{
 map = [
     '$####';
     'S#X..';
     '0.S.0'];
+%}
+map = [
+    '$####';
+    'S#..X';
+    '..S..'];
 H = HMLMDP(map);
 %H.sample();
 H.sample_gui();
 
 
+%{
 %% Full HMLMDP
 %
 
@@ -88,6 +97,7 @@ H = HMLMDP(map, true, 2);
 H.sample();
 
 H.plotZi();
+%}
 
 
 %% Big HMLMDP
@@ -96,7 +106,7 @@ H.plotZi();
 fprintf('\n\n\n\n\n\n\n\n--------------------------------- big HMLMDP ----------------------------------\n\n\n\n\n\n\n');
 
 map = [
-    'SX...#.....';
+    'S.X..#.....';
     '.....#.....';
     '..#S.......';
     '.#...#.S##.';
@@ -106,7 +116,7 @@ map = [
     '..#..#...S.';
     '..#S.#.....';
     '.0.....S#..';
-    '.....#..$..'];
+    '.....#....$'];
 H = HMLMDP(map);
 %H.sample();
 H.sample_gui();
@@ -115,6 +125,7 @@ H.sample_gui();
 %% Big full HMLMDP
 %
 
+%{
 fprintf('\n\n\n\n\n\n\n\n--------------------------------- big full HMLMDP ----------------------------------\n\n\n\n\n\n\n');
 
 map = [
@@ -134,6 +145,7 @@ H = HMLMDP(map, true);
 H.sample_gui();
 
 %H.plotZi();
+%}
 
 
 %% Big full HMLMDP + decomposition of Zi
@@ -203,10 +215,12 @@ fprintf('\n\n\n---------- TD(0) learning ------------\n\n\n');
 
 map = [
     '$####';
-    '.#X..';
+    '.#..X';
     '.....'];
 M = MDP(map);
 
+M.sampleQ_gui();
+%{
 for i = 1:20
     M.sampleSARSA(find(map == 'X'), true);
 end
@@ -225,6 +239,7 @@ M.sampleAC_gui();
 M.solveGPI();
 M.sampleGPI();
 M.sampleGPI_gui();
+%}
 
 
 %% Options framework
@@ -243,7 +258,7 @@ S.sampleQ_gui();
 
 %% Big options framework
 %
-
+%{
 fprintf('\n\n\n\n\n\n\n\n--------------------------------- big options framework ----------------------------------\n\n\n\n\n\n\n');
 
 map = [
@@ -262,6 +277,7 @@ S = SMDP(map);
 %O.sampleQ(find(map == 'X'), true);
 %O.sampleQ();
 S.sampleQ_gui();
+%}
 
 
 %% HSM framework
@@ -299,7 +315,7 @@ M.sample0_gui(11);
 
 %% MAXQ framework larger
 %
-
+%{
 fprintf('\n\n\n\n\n\n\n\n--------------------------------- larger MAXQ ----------------------------------\n\n\n\n\n\n\n');
 
 map = [
@@ -320,3 +336,4 @@ M.sample0_gui(2);
 %M.sampleQ(find(map == 'X'), true);
 %M.sampleQ_gui();
 
+%}

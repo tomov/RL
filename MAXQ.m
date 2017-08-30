@@ -28,6 +28,7 @@ classdef MAXQ < handle
         % GUI
         %
         gui_start_s = [];
+        gui_fig2 = []; % figure 2
     end
 
     methods
@@ -167,6 +168,9 @@ classdef MAXQ < handle
             state.new_s = 0; % as returned from the lower layer
             state.a = -1; % chosen action = max node
             state.pa = -1; % q node = parent of chosen action
+
+            state.rs = [];
+            state.pes = [];
         end
        
         % Iterative MaxQ-0
@@ -219,6 +223,8 @@ classdef MAXQ < handle
 
                     stack(end).new_s = new_s; % set up locals for second half of recursion
                     stack(end).r = r;
+                    stack(end).rs = [stack(end).rs, r]; % logging 
+                    stack(end).pes = [stack(end).pes, pe];
 
                 elseif ismember(s, self.Max_nodes{a}.B)
                     % Illegal move to a subtask for which s is a boundary state
@@ -227,14 +233,15 @@ classdef MAXQ < handle
                     %
                     new_s = s;
                     r = MAXQ.R_illegal;
-
                     pe = r - self.Max_nodes{a}.V(s); % Eq 11: PE = R(s') - Vi(s)
                     self.Max_nodes{a}.V(s) = self.Max_nodes{a}.V(s) + MDP.alpha * pe; % Eq 11: Vi(s) = Vi(s) + alpha * PE
 
                     fprintf('%s       Illegal action -> new_s = %d, r = %.2f, pe = %.2f, V(a,s) = %.2f\n', spaces, new_s, r, pe, self.Max_nodes{a}.V(s));
 
-                    stack(end).new_s = s;
+                    stack(end).new_s = s; % locals
                     stack(end).r = r;
+                    stack(end).rs = [stack(end).rs, r]; % logging 
+                    stack(end).pes = [stack(end).pes, pe];
 
                 else
                     % a is a subroutine -> find reward r and new state s' recursively from children
@@ -266,7 +273,8 @@ classdef MAXQ < handle
 
                 % Update Ci(s, a)
                 %
-                pe = self.Max_nodes{p}.V(new_s) - self.Q_nodes{pa}.C(s); % Eq 10: PE = Vi(s') - Ci(s,a)
+                r = self.Max_nodes{p}.V(new_s);
+                pe = r - self.Q_nodes{pa}.C(s); % Eq 10: PE = Vi(s') - Ci(s,a)
                 self.Q_nodes{pa}.C(s) = self.Q_nodes{pa}.C(s) + MDP.alpha * pe; % Eq 10: Ci(s,a) = Ci(s,a) + alpha * PE
                 self.Q_nodes{pa}.Q(s) = self.Q_nodes{pa}.C(s) + self.Max_nodes{a}.V(s); % Eq 7: Qi(s,a) = Ci(s,a) + Va(s)
 
@@ -278,6 +286,13 @@ classdef MAXQ < handle
 
                 fprintf('%s Qs = [%s], pe = %.2f, C(p,s,a) = %.2f, V(p,s) = %.2f, Rtot = %.2f\n', spaces, sprintf('%.2f ', Q), pe, self.Q_nodes{pa}.C(s), self.Max_nodes{p}.V(s), stack(end).Rtot);
 
+                % Logging
+                %
+                stack(end).rs = [stack(end).rs, r];
+                stack(end).pes = [stack(end).pes, pe];
+
+                % Check for boundary conditions
+                %
                 if stack(end).done || ismember(new_s, self.Max_nodes{p}.B)
                     % Boundary state
                     %
@@ -425,6 +440,7 @@ classdef MAXQ < handle
         function sample_gui_helper(self, init_fn, step_fn, s)
             self.mdp.gui_state = init_fn(s);
 			self.mdp.gui_map = figure;
+			self.gui_fig2 = figure;
             self.plot_gui();
 
             step_callback = @(hObject, eventdata) self.step_gui_callback(step_fn, hObject, eventdata);
@@ -481,6 +497,8 @@ classdef MAXQ < handle
 
             disp(state);
 
+            % plot MAXQ graph + V- and Q-values
+            %
             n = 5;
             l = 0;
             for layer = 2:-1:0
@@ -552,6 +570,28 @@ classdef MAXQ < handle
             else
                 xlabel(label);
             end
+
+
+            % plot PEs
+            %
+            figure(self.gui_fig2);
+            n = numel(stack);
+            m = 1;
+            for i = 1:numel(stack)
+                state = stack(i);
+                p = state.p;
+                max_node = self.Max_nodes{p};
+
+                subplot(n, m, i);
+                plot(state.rs);
+                hold on;
+                plot(state.pes);
+                hold off;
+                title(sprintf('%s (%d)', max_node.name, max_node.p));
+                legend({'reward', 'PE'});
+            end
+
+            figure(self.mdp.gui_map);
         end
 
     end

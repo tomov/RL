@@ -305,9 +305,9 @@ map = [
     '$####';
     'B#AAA';
     'BBAAA'];
-%map = ['$A'; '##'];
+%map = ['$BBA'; '####'];
 M = MAXQ(map);
-%M.maxQ0(3);
+%M.maxQ0(11);
 M.sample0_gui(11);
 %M.sampleQ(find(map == 'X'), true);
 %M.sampleQ_gui();

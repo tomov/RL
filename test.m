@@ -290,7 +290,32 @@ map = [
     'B#AAA';
     'BBAAA'];
 M = MAXQ(map);
-%M.maxQQ(11);
+%M.maxQ0(11);
 M.sample0_gui(11);
 %M.sampleQ(find(map == 'X'), true);
 %M.sampleQ_gui();
+
+
+%% MAXQ framework larger
+%
+
+fprintf('\n\n\n\n\n\n\n\n--------------------------------- larger MAXQ ----------------------------------\n\n\n\n\n\n\n');
+
+map = [
+    'AAAAA#CCCCC';
+    'AAAAACCCCCC';
+    '##A#####C##';
+    'BBBBB#HHHHH';
+    'BBBBBBHHHHH';
+    '##E#####D##';
+    'EEEEE#DDDDD';
+    'EEEEE#DDDDD';
+    'E######D###';
+    'FFFFFGGGGGG';
+    'FFFFF#GG$GG'];
+M = MAXQ(map);
+%M.maxQ0(11);
+M.sample0_gui(2);
+%M.sampleQ(find(map == 'X'), true);
+%M.sampleQ_gui();
+

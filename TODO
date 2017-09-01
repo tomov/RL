@@ -55,6 +55,9 @@ successor-feature approach (Barreto 2016?)
 GOALS FOR TODAY:
 
 
+fix maxq
+make hmlmdp's local and online
+
 
 
 illegal actions

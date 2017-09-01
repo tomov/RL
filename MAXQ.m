@@ -4,7 +4,7 @@
 classdef MAXQ < handle
 
     properties (Constant = true)
-        R_I = -1; % penalty for remaining stationary. TODO dedupe with MDP.R_I 
+        R_I = 0; % penalty for remaining stationary. TODO dedupe with MDP.R_I 
         R_illegal = -1; % penalty for trying to enter a subtask for which s is illegal TODO 
 
         % Maze
@@ -54,11 +54,11 @@ classdef MAXQ < handle
                 max_node = struct;
                 max_node.is_primitive = true;
                 max_node.a = a;
-                max_node.p = a;
+                max_node.i = a;
                 max_node.I = self.mdp.I;
                 max_node.B = self.mdp.B;
                 max_node.layer = 0;
-                max_node.name = ['MaxAction ', num2str(a)];
+                max_node.name = ['MaxAction ', num2str(a), ' (', MDP.A_names{a}, ')'];
                 max_node.V = zeros(numel(mdp.S), 1); % Vi(s) from paper
 
                 self.Max_nodes = [self.Max_nodes, max_node];
@@ -73,7 +73,7 @@ classdef MAXQ < handle
                 max_node = struct;
                 max_node.is_primitive = false;
                 max_node.layer = 1;
-                max_node.p = numel(self.Max_nodes) + 1;
+                max_node.i = numel(self.Max_nodes) + 1;
                 max_node.name = ['MaxSubtask ', c];
                 max_node.I = subtask_inds'; % internal "active" states (S in the paper) = all states labeled for the subtask
                 max_node.B = setdiff(mdp.S, max_node.I); % boundary "terminated" states (T in the paper)
@@ -86,7 +86,7 @@ classdef MAXQ < handle
                     q_node = struct;
                     q_node.a = i; % child = primitive action i
                     q_node.layer = 0.5;
-                    q_node.p = max_node.p;
+                    q_node.i = max_node.i;
                     q_node.idx = numel(self.Q_nodes) + 1;
                     q_node.name = ['QAction ', num2str(i)];
                     q_node.C = zeros(numel(mdp.S), 1); % Ci(s,a) from paper. Notice that i and a are specified by the q_node
@@ -104,7 +104,7 @@ classdef MAXQ < handle
             max_node = struct;
             max_node.is_primitive = false;
             max_node.layer = 2;
-            max_node.p = numel(self.Max_nodes) + 1;
+            max_node.i = numel(self.Max_nodes) + 1;
             max_node.name = ['MaxRoot'];
             max_node.I = mdp.I;
             max_node.B = mdp.B;
@@ -119,7 +119,7 @@ classdef MAXQ < handle
                     q_node = struct;
                     q_node.a = i;
                     q_node.layer = 1.5;
-                    q_node.p = max_node.p;
+                    q_node.i = max_node.i;
                     q_node.idx = numel(self.Q_nodes) + 1;
                     q_node.name = ['QSubtask ', m.name(end)];
                     q_node.C = zeros(numel(mdp.S), 1); % Ci(s,a) from paper. Notice that i and a are specified by the q_node
@@ -155,19 +155,21 @@ classdef MAXQ < handle
             stack = [state]; % we're unrolling the recursion baby
         end
 
-        function state = init_state0(self, s, p)
-            state.Rtot = 0;
+        function state = init_state0(self, s, i)
+            state.Rtot = 0; % returned to higher layer as r
             state.path = [];
             state.s = s;
-            state.p = p; % subtask / subroutine = max node = 'action'
+            state.i = i; % subtask / subroutine = max node = 'action'
             state.done = false; % have we reached a terminal state?
             state.method = 'MAXQ-0';
 
             state.second_half = false; % whether we're coming back from the recursion
-            state.r = 0; % as returned from the lower layer
-            state.new_s = 0; % as returned from the lower layer
-            state.a = -1; % chosen action = max node
-            state.pa = -1; % q node = parent of chosen action
+            state.r = NaN; % as returned from the lower layer
+            state.new_s = NaN; % as returned from the lower layer; returned to higher layer
+            state.n = NaN; % as returned from lower layer; returned to higher layer as count
+            state.a = NaN; % local: chosen action = max node
+            state.ia = NaN; % local: q node = parent of chosen action
+            state.count = 0; % local: number of steps
 
             state.rs = [];
             state.pes = [];
@@ -181,9 +183,10 @@ classdef MAXQ < handle
 
             state = stack(end);
             s = state.s;
-            p = state.p;
+            i = state.i;
+            count = state.count;
 
-            max_node = self.Max_nodes{p};
+            max_node = self.Max_nodes{i};
             q_children = max_node.children;
             q_nodes = [self.Q_nodes{q_children}];
             max_children = [q_nodes.a]; % max children of the current max node (subroutine) p
@@ -193,17 +196,19 @@ classdef MAXQ < handle
                 % up to calling maxQ0 recursively, or executing a primitive action
                 %
 
+                fprintf('\n\n\n');
+
                 % Choose action / subroutine a
                 %
-                pi = self.glie(s, p);
+                pi = self.glie(s, i);
                 j = samplePF(pi);
-                pa = q_children(j);
+                ia = q_children(j);
                 a = max_children(j);
                 stack(end).a = a;
-                stack(end).pa = pa;
+                stack(end).ia = ia;
                 stack(end).second_half = true; % caller must move on next time
 
-                fprintf('\n\n\n%s At maxQ0(%d, %d), executing a = %d (pa = %d, pi = %s, q children = %s, max children = %s)\n', spaces, s, p, a, pa, sprintf('%.2f ', pi), sprintf('%d ', q_children), sprintf('%d ', max_children));
+                fprintf('%s At maxQ0(i = %d, s = %d), executing a = %d (ia = %d, pi = %s, q children = %s, max children = %s)\n', spaces, i, s, a, ia, sprintf('%.2f ', pi), sprintf('%d ', q_children), sprintf('%d ', max_children));
                 disp(max_node);
 
                 % Execute a
@@ -223,6 +228,7 @@ classdef MAXQ < handle
 
                     stack(end).new_s = new_s; % set up locals for second half of recursion
                     stack(end).r = r;
+                    stack(end).n = 1;
                     stack(end).rs = [stack(end).rs, r]; % logging 
                     stack(end).pes = [stack(end).pes, pe];
 
@@ -231,22 +237,22 @@ classdef MAXQ < handle
                     % => penalize so we don't do it again
                     % TODO is this okay? or even necessary?
                     %
-                    new_s = s;
-                    r = MAXQ.R_illegal;
-                    pe = r - self.Max_nodes{a}.V(s); % Eq 11: PE = R(s') - Vi(s)
-                    self.Max_nodes{a}.V(s) = self.Max_nodes{a}.V(s) + MDP.alpha * pe; % Eq 11: Vi(s) = Vi(s) + alpha * PE
+                    %r = MAXQ.R_illegal;
+                    %pe = r - self.Max_nodes{a}.V(s); % Eq 11: PE = R(s') - Vi(s)
+                    %self.Max_nodes{a}.V(s) = self.Max_nodes{a}.V(s) + MDP.alpha * pe; % Eq 11: Vi(s) = Vi(s) + alpha * PE
 
-                    fprintf('%s       Illegal action -> new_s = %d, r = %.2f, pe = %.2f, V(a,s) = %.2f\n', spaces, new_s, r, pe, self.Max_nodes{a}.V(s));
+                    fprintf('%s       ----------- Illegal action a = %d for s = %d\n', spaces, a, s);
 
-                    stack(end).new_s = s; % locals
-                    stack(end).r = r;
-                    stack(end).rs = [stack(end).rs, r]; % logging 
-                    stack(end).pes = [stack(end).pes, pe];
+                    %stack(end).new_s = s; % locals
+                    %stack(end).r = r;
+                    %stack(end).rs = [stack(end).rs, r]; % logging 
+                    %stack(end).pes = [stack(end).pes, pe];
+                    stack(end).second_half = false; % try again...
 
                 else
                     % a is a subroutine -> find reward r and new state s' recursively from children
                     %
-                    fprintf('%s Complex action -> calling maxQ0(%d, %d)\n', spaces, s, a);
+                    fprintf('%s Complex action -> calling maxQ0(a = %d, s = %d)\n', spaces, a, i);
 
                     state = self.init_state0(s, a);
                     stack = [stack, state]; % recurse -> put next call to maxQ0(s,a) on top of stack
@@ -256,35 +262,34 @@ classdef MAXQ < handle
                 % Do the second half of the recursion
                 %
 
-                % get locals from stack
+                % get locals / returned vars from stack
                 %
                 a = stack(end).a;
-                pa = stack(end).pa;
+                ia = stack(end).ia;
                 new_s = stack(end).new_s;
+                n = stack(end).n;
 
-                assert(~ismember(s, self.Max_nodes{p}.B)); % cannot update a boundary state
+                assert(~ismember(s, self.Max_nodes{i}.B)); % cannot update a boundary state
 
-                fprintf('%s ...back to maxQ0(%d, %d) after calling maxQ0(%d, %d): new_s = %d, r = %.2f\n', spaces, s, p, s, a, new_s, stack(end).r);
+                fprintf('%s ...back to maxQ0(i = %d, s = %d) after calling maxQ0(a = %d, s = %d): new_s = %d, r = %.2f, n = %d\n', spaces, i, s, a, s, new_s, stack(end).r, n);
 
-                % Update total reward
+                % Update locals 
                 %
                 stack(end).Rtot = stack(end).Rtot + stack(end).r;
                 stack(end).path = [stack(end).path, new_s];
+                stack(end).count = stack(end).count + n;
 
                 % Update Ci(s, a)
                 %
-                r = self.Max_nodes{p}.V(new_s);
-                pe = r - self.Q_nodes{pa}.C(s); % Eq 10: PE = Vi(s') - Ci(s,a)
-                self.Q_nodes{pa}.C(s) = self.Q_nodes{pa}.C(s) + MDP.alpha * pe; % Eq 10: Ci(s,a) = Ci(s,a) + alpha * PE
-                self.Q_nodes{pa}.Q(s) = self.Q_nodes{pa}.C(s) + self.Max_nodes{a}.V(s); % Eq 7: Qi(s,a) = Ci(s,a) + Va(s)
+                r = (MDP.gamma ^ n) * self.Max_nodes{i}.V(new_s);
+                pe = r - self.Q_nodes{ia}.C(s); % Eq 10: PE = Vi(s') - Ci(s,a)
+                self.Q_nodes{ia}.C(s) = self.Q_nodes{ia}.C(s) + MDP.alpha * pe; % Eq 10: Ci(s,a) = Ci(s,a) + alpha * PE
+                self.Q_nodes{ia}.Q(s) = self.Q_nodes{ia}.C(s) + self.Max_nodes{a}.V(s); % Eq 7: Qi(s,a) = Ci(s,a) + Va(s)
 
-                Q = [];
-                for j = 1:numel(max_children)
-                    Q = [Q, self.Q_nodes{q_children(j)}.Q(s)]; % Qi(s,a)
-                end
-                self.Max_nodes{p}.V(s) = max(Q); % Eq 8: Vi(s) = max Qi(s,:)
+                [~, Q] = self.glie(s, i);
+                self.Max_nodes{i}.V(s) = max(Q); % Eq 8: Vi(s) = max Qi(s,:)
 
-                fprintf('%s Qs = [%s], pe = %.2f, C(p,s,a) = %.2f, V(p,s) = %.2f, Rtot = %.2f\n', spaces, sprintf('%.2f ', Q), pe, self.Q_nodes{pa}.C(s), self.Max_nodes{p}.V(s), stack(end).Rtot);
+                fprintf('%s Qs = [%s], pe = %.2f, C = %.2f, V = %.2f, Rtot = %.2f, count = %d\n', spaces, sprintf('%.2f ', Q), pe, self.Q_nodes{ia}.C(s), self.Max_nodes{i}.V(s), stack(end).Rtot, stack(end).count);
 
                 % Logging
                 %
@@ -293,7 +298,7 @@ classdef MAXQ < handle
 
                 % Check for boundary conditions
                 %
-                if stack(end).done || ismember(new_s, self.Max_nodes{p}.B)
+                if stack(end).done || ismember(new_s, self.Max_nodes{i}.B)
                     % Boundary state
                     %
                     fprintf('%s DONE!\n', spaces);
@@ -303,6 +308,7 @@ classdef MAXQ < handle
                         %
                         stack(end-1).r = stack(end).Rtot;
                         stack(end-1).new_s = stack(end).new_s;
+                        stack(end-1).n = stack(end).count;
                         stack(end-1).second_half = true; % tell caller to move on
                         stack = stack(1:end-1);
                     else
@@ -320,33 +326,33 @@ classdef MAXQ < handle
         end
 
 
-
+%{
 
         % Recursive MaxQ-0
         %
-        function [Rtot, new_s] = maxQ0(self, s, p)
+        function [Rtot, new_s] = maxQ0(self, s, i)
             if ~exist('p', 'var')
-                p = self.root; % start from the top
+                i = self.root; % start from the top
             end
-            spaces = repmat(' ', 1, (2 - self.Max_nodes{p}.layer) * 5);
+            spaces = repmat(' ', 1, (2 - self.Max_nodes{i}.layer) * 5);
             
             Rtot = 0;
             done = false;
 
             while ~done
-                max_node = self.Max_nodes{p};
+                max_node = self.Max_nodes{i};
                 q_children = max_node.children;
                 q_nodes = [self.Q_nodes{q_children}];
                 max_children = [q_nodes.a]; % max children of the current max node (subroutine) p
 
                 % Choose action / subroutine a
                 %
-                pi = self.glie(s, p);
+                pi = self.glie(s, i);
                 j = samplePF(pi);
-                pa = q_children(j);
+                ia = q_children(j);
                 a = max_children(j);
 
-                fprintf('\n\n\n%s At maxQ0(%d, %d), executing a = %d (pa = %d, pi = %s, q children = %s, max children = %s)\n', spaces, s, p, a, pa, sprintf('%.2f ', pi), sprintf('%d ', q_children), sprintf('%d ', max_children));
+                fprintf('\n\n\n%s At maxQ0(%d, %d), executing a = %d (ia = %d, pi = %s, q children = %s, max children = %s)\n', spaces, s, i, a, ia, sprintf('%.2f ', pi), sprintf('%d ', q_children), sprintf('%d ', max_children));
                 disp(max_node);
 
                 % Execute a
@@ -371,8 +377,8 @@ classdef MAXQ < handle
                     new_s = s;
                     r = MAXQ.R_illegal;
 
-                    pe = r - self.Max_nodes{a}.V(s); % Eq 11: PE = R(s') - Vi(s)
-                    self.Max_nodes{a}.V(s) = self.Max_nodes{a}.V(s) + MDP.alpha * pe; % Eq 11: Vi(s) = Vi(s) + alpha * PE
+                    %pe = r - self.Max_nodes{a}.V(s); % Eq 11: PE = R(s') - Vi(s)
+                    %self.Max_nodes{a}.V(s) = self.Max_nodes{a}.V(s) + MDP.alpha * pe; % Eq 11: Vi(s) = Vi(s) + alpha * PE
 
                     fprintf('%s       Illegal action -> new_s = %d, r = %.2f, pe = %.2f, V(a,s) = %.2f\n', spaces, new_s, r, pe, self.Max_nodes{a}.V(s));
 
@@ -383,10 +389,10 @@ classdef MAXQ < handle
 
                     [r, new_s] = self.maxQ0(s, a);
 
-                    fprintf('%s ...back to maxQ0(%d, %d) after calling maxQ0(%d, %d): new_s = %d, r = %.2f\n', spaces, s, p, s, a, new_s, r);
+                    fprintf('%s ...back to maxQ0(%d, %d) after calling maxQ0(%d, %d): new_s = %d, r = %.2f\n', spaces, s, i, s, a, new_s, r);
                 end
 
-                assert(~ismember(s, self.Max_nodes{p}.B)); % cannot update a boundary state
+                assert(~ismember(s, self.Max_nodes{i}.B)); % cannot update a boundary state
 
                 % Update total reward
                 %
@@ -394,19 +400,19 @@ classdef MAXQ < handle
 
                 % Update Ci(s, a)
                 %
-                pe = self.Max_nodes{p}.V(new_s) - self.Q_nodes{pa}.C(s); % Eq 10: PE = Vi(s') - Ci(s,a)
-                self.Q_nodes{pa}.C(s) = self.Q_nodes{pa}.C(s) + MDP.alpha * pe; % Eq 10: Ci(s,a) = Ci(s,a) + alpha * PE
-                self.Q_nodes{pa}.Q(s) = self.Q_nodes{pa}.C(s) + self.Max_nodes{a}.V(s); % Eq 7: Qi(s,a) = Ci(s,a) + Va(s)
+                pe = self.Max_nodes{i}.V(new_s) - self.Q_nodes{ia}.C(s); % Eq 10: PE = Vi(s') - Ci(s,a)
+                self.Q_nodes{ia}.C(s) = self.Q_nodes{ia}.C(s) + MDP.alpha * pe; % Eq 10: Ci(s,a) = Ci(s,a) + alpha * PE
+                self.Q_nodes{ia}.Q(s) = self.Q_nodes{ia}.C(s) + self.Max_nodes{a}.V(s); % Eq 7: Qi(s,a) = Ci(s,a) + Va(s)
 
                 Q = [];
                 for j = 1:numel(max_children)
                     Q = [Q, self.Q_nodes{q_children(j)}.Q(s)]; % Qi(s,a)
                 end
-                self.Max_nodes{p}.V(s) = max(Q); % Eq 8: Vi(s) = max Qi(s,:)
+                self.Max_nodes{i}.V(s) = max(Q); % Eq 8: Vi(s) = max Qi(s,:)
 
-                fprintf('%s Qs = [%s], pe = %.2f, C(p,s,a) = %.2f, V(p,s) = %.2f, Rtot = %.2f\n', spaces, sprintf('%.2f ', Q), pe, self.Q_nodes{pa}.C(s), self.Max_nodes{p}.V(s), Rtot);
+                fprintf('%s Qs = [%s], pe = %.2f, C(p,s,a) = %.2f, V(p,s) = %.2f, Rtot = %.2f\n', spaces, sprintf('%.2f ', Q), pe, self.Q_nodes{ia}.C(s), self.Max_nodes{i}.V(s), Rtot);
 
-                if ismember(new_s, self.Max_nodes{p}.B)
+                if ismember(new_s, self.Max_nodes{i}.B)
                     % Boundary state
                     %
                     fprintf('%s DONE!\n', spaces);
@@ -416,17 +422,43 @@ classdef MAXQ < handle
                 s = new_s;
             end
         end
-
-        function p = glie(self, s, p)
+%}
+        
+        function [p, Q] = glie(self, s, i)
             % Actions = child q-nodes of the max_node
             % TODO implement actual greedy in the limit with infinite exploration
             %
-            max_node = self.Max_nodes{p};
+            max_node = self.Max_nodes{i};
+            q_children = max_node.children;
+            q_nodes = [self.Q_nodes{q_children}];
+            max_children = [q_nodes.a]; % max children of the current max node (subroutine) p
+
             Q = [];
-            for i = 1:numel(max_node.children)
-                q_node = self.Q_nodes{max_node.children(i)};
-                Q = [Q, q_node.Q(s)]; % get all the Q-values
+            for j = 1:numel(q_children)
+                ia = q_children(j);
+                a = max_children(j);
+                if self.Max_nodes{a}.is_primitive
+                    % going to a primitive action
+                    % => make sure we can execute it
+                    %
+                    if self.mdp.P(s, s, a) == 1
+                        Q = [Q, -Inf];
+                    else
+                        Q = [Q, self.Q_nodes{ia}.Q(s)];
+                    end
+                else
+                    % going to a subroutine
+                    %
+                    if ismember(s, self.Max_nodes{a}.B)
+                        % don't go to subtasks for which s is a boundary state, unless they're primitive actions
+                        %
+                        Q = [Q, -Inf];
+                    else
+                        Q = [Q, self.Q_nodes{ia}.Q(s)];
+                    end
+                end
             end
+
             p = eps_greedy(Q, MDP.eps);
             fprintf('   glie for %s: %s (p = %s)\n', max_node.name, sprintf('%.2f ', Q), sprintf('%.2f ', p));
         end
@@ -495,13 +527,15 @@ classdef MAXQ < handle
             state = stack(end);
             [x, y] = ind2sub(size(self.map), state.s);
 
-            disp(state);
+            %disp(state);
 
             % plot MAXQ graph + V- and Q-values
             %
-            n = 5;
+            n = 7;
             l = 0;
             for layer = 2:-1:0
+                % V values of max nodes
+                %
                 max_nodes = {};
                 for i = 1:numel(self.Max_nodes)
                     if self.Max_nodes{i}.layer == layer
@@ -520,18 +554,20 @@ classdef MAXQ < handle
                     subplot(n, m, i + (l-1)*m + offs);
                     vi = max_node.V(self.mdp.I);
                     imagesc(reshape(vi, size(self.map)));
-                    if max_node.p == state.a
+                    if max_node.i == state.a
                         text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
-                    elseif max_node.p == state.p
+                    elseif max_node.i == state.i
                         text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'white');
-                    elseif ismember(max_node.p, [stack.p])
+                    elseif ismember(max_node.i, [stack.i])
                         text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'black');
                     end
                     if i == 1, ylabel('V(s)'); end
-                    title(sprintf('%s (%d)', max_node.name, max_node.p));
+                    title(sprintf('%s (%d)', max_node.name, max_node.i));
                     axis off;
                 end
 
+                % Q values of Q nodes
+                %
                 if layer == 0
                     break;
                 end
@@ -552,13 +588,32 @@ classdef MAXQ < handle
                     subplot(n, m, i + (l-1)*m + offs);
                     qi = q_node.Q(self.mdp.I);
                     imagesc(reshape(qi, size(self.map)));
-                    if q_node.a == state.a && q_node.p == state.p
+                    if q_node.a == state.a && q_node.i == state.i
                         text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
-                    elseif find(q_node.a == [stack.a]) == find(q_node.p == [stack.p])
+                    elseif find(q_node.a == [stack.a]) == find(q_node.i == [stack.i])
                         text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'black');
                     end
                     if i == 1, ylabel('Q(s,a)'); end
                     title(sprintf('%s (%d)', q_node.name, q_node.idx));
+                    axis off;
+                end
+
+                % C values of Q nodes
+                %
+                m = max(8, numel(q_nodes));
+                offs = max(0, floor((8 - numel(q_nodes)) / 2));
+                l = l + 1;
+                for i = 1:numel(q_nodes)
+                    q_node = q_nodes{i};
+                    subplot(n, m, i + (l-1)*m + offs);
+                    ci = q_node.C(self.mdp.I);
+                    imagesc(reshape(ci, size(self.map)));
+                    if q_node.a == state.a && q_node.i == state.i
+                        text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
+                    elseif find(q_node.a == [stack.a]) == find(q_node.i == [stack.i])
+                        text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'black');
+                    end
+                    if i == 1, ylabel('C(s,a)'); end
                     axis off;
                 end
             end
@@ -577,17 +632,17 @@ classdef MAXQ < handle
             figure(self.gui_fig2);
             n = numel(stack);
             m = 1;
-            for i = 1:numel(stack)
-                state = stack(i);
-                p = state.p;
-                max_node = self.Max_nodes{p};
+            for j = 1:numel(stack)
+                state = stack(j);
+                i = state.i;
+                max_node = self.Max_nodes{i};
 
-                subplot(n, m, i);
+                subplot(n, m, j);
                 plot(state.rs);
                 hold on;
                 plot(state.pes);
                 hold off;
-                title(sprintf('%s (%d)', max_node.name, max_node.p));
+                title(sprintf('%s (%d)', max_node.name, max_node.i));
                 legend({'reward', 'PE'});
             end
 

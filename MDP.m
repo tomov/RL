@@ -20,6 +20,20 @@ classdef MDP < handle
         agent_symbol = 'X';
         empty_symbol = '.';
         impassable_symbols = '#';
+        % action 1 = stand still
+        % actions 2,3,4,5 = move to adjacent squares
+        % action 6 = pick up reward (to make it compatible with LMDPs)
+        %
+        % adjacency list
+        % each row = [dx, dy, non-normalized P(s'|s)]
+        % => random walk, but also bias towards staying in 1 place
+        %
+        adj = [0, 0; ...
+            -1, 0; ...
+            0, -1; ...
+            1, 0; ...
+            0, 1];
+        A_names = {'stay', 'up', 'left', 'down', 'right', 'eat'};
     end
 
     properties (Access = public)
@@ -63,7 +77,7 @@ classdef MDP < handle
             S = 1 : N; % set of states
             I = 1 : Ni; % set of internal states
             B = Ni + 1 : Ni + Nb; % set of boundary states
-            A = 1:6;  % set of actions
+            A = 1:numel(MDP.A_names);  % set of actions
             self.S = S;
             self.I = I;
             self.B = B;
@@ -78,21 +92,7 @@ classdef MDP < handle
             H = zeros(N, numel(A)); % policy parameters
             R = nan(N, 1); % instantaneous reward f'n R(s)
           
-            % action 1 = stand still
-            % actions 2,3,4,5 = move to adjacent squares
-            % action 6 = pick up reward (to make it compatible with LMDPs)
-            %
-            % adjacency list
-            % each row = [dx, dy, non-normalized P(s'|s)]
-            % => random walk, but also bias towards staying in 1 place
-            %
-            adj = [0, 0; ...
-                -1, 0; ...
-                0, -1; ...
-                1, 0; ...
-                0, 1];
-            assert(size(adj, 1) + 1 == numel(A));
-
+            assert(size(MDP.adj, 1) + 1 == numel(A));
             % iterate over all internal states s
             %
             for x = 1:size(map, 1)
@@ -113,9 +113,9 @@ classdef MDP < handle
                     % Iterate over all adjacent states s --> s' and update passive
                     % dynamics P
                     %
-                    for a = 1:size(adj, 1)
-                        new_x = x + adj(a, 1);
-                        new_y = y + adj(a, 2);
+                    for a = 1:size(MDP.adj, 1)
+                        new_x = x + MDP.adj(a, 1);
+                        new_y = y + MDP.adj(a, 2);
                         if new_x <= 0 || new_x > size(map, 1) || new_y <= 0 || new_y > size(map, 2)
                             continue % outside the map
                         end

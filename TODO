@@ -54,13 +54,17 @@ successor-feature approach (Barreto 2016?)
 
 GOALS FOR TODAY:
 
+pseudorewards for maxq
+rm illegal actions (going to subtask that's not allowed) -> replace w/ pseudorewards
+my R~-- scheme
 
-fix maxq
+
+
+
+
 make hmlmdp's local and online
 
 
-
-illegal actions
 
 
 finding the options?

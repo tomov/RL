@@ -50,15 +50,7 @@ classdef MAXQ < handle
             % Lowest layer of the hierarchy: max nodes == primitive actions
             %
             for a = mdp.A
-                max_node = struct;
-                max_node.is_primitive = true;
-                max_node.a = a;
-                max_node.i = a;
-                max_node.I = self.mdp.I;
-                max_node.B = self.mdp.B;
-                max_node.layer = 0;
-                max_node.name = ['MaxAction ', num2str(a), ' (', MDP.A_names{a}, ')'];
-                max_node.V = zeros(numel(mdp.S), 1); % Vi(s) from paper
+                max_node = self.init_max_node(a, true, 0, ['MaxAction ', num2str(a), ' (', MDP.A_names{a}, ')'], self.mdp.I);
 
                 self.Max_nodes = [self.Max_nodes, max_node];
             end
@@ -68,29 +60,14 @@ classdef MAXQ < handle
             map = self.map;
             for c = unique(map(all_subtask_inds))' % for each subtask
                 subtask_inds = find(map == c);
-               
-                max_node = struct;
-                max_node.is_primitive = false;
-                max_node.layer = 1;
-                max_node.i = numel(self.Max_nodes) + 1;
-                max_node.name = ['MaxSubtask ', c];
-                max_node.I = subtask_inds'; % internal "active" states (S in the paper) = all states labeled for the subtask
-                max_node.B = setdiff(mdp.S, max_node.I); % boundary "terminated" states (T in the paper)
-                max_node.V = zeros(numel(mdp.S), 1); % Vi(s) from paper
+
+                max_node = self.init_max_node(numel(self.Max_nodes) + 1, false, 1, ['MaxSubtask ', c], subtask_inds')
       
                 % create children q-nodes == the primitive actions.
                 % they are parents of the primitve action max nodes
                 max_node.children = [];
                 for i = mdp.A
-                    q_node = struct;
-                    q_node.a = i; % child = primitive action i
-                    q_node.layer = 0.5;
-                    q_node.i = max_node.i;
-                    q_node.idx = numel(self.Q_nodes) + 1;
-                    q_node.name = ['QAction ', num2str(i)];
-                    q_node.C = zeros(numel(mdp.S), 1); % Ci(s,a) from paper. Notice that i and a are specified by the q_node
-                    q_node.Q = zeros(numel(mdp.S), 1); % Qi(s,a) from paper
-
+                    q_node = self.init_q_node(max_node.i, i, 0.5, ['QAction ', num2str(i)]);
                     self.Q_nodes = [self.Q_nodes, q_node];
                     max_node.children = [max_node.children, numel(self.Q_nodes)];
                 end
@@ -100,14 +77,7 @@ classdef MAXQ < handle
 
             % Last layer = root node
             %
-            max_node = struct;
-            max_node.is_primitive = false;
-            max_node.layer = 2;
-            max_node.i = numel(self.Max_nodes) + 1;
-            max_node.name = ['MaxRoot'];
-            max_node.I = mdp.I;
-            max_node.B = mdp.B;
-            max_node.V = zeros(numel(mdp.S), 1); % Vi(s) from paper
+            max_node = self.init_max_node(numel(self.Max_nodes) + 1, false, 2, 'MaxRoot', mdp.I)
 
             % children of root = q-nodes -> the subtasks
             max_node.children = [];
@@ -115,14 +85,8 @@ classdef MAXQ < handle
                 m = self.Max_nodes{i};
                 if m.layer == 1
                     assert(~m.is_primitive);
-                    q_node = struct;
-                    q_node.a = i;
-                    q_node.layer = 1.5;
-                    q_node.i = max_node.i;
-                    q_node.idx = numel(self.Q_nodes) + 1;
-                    q_node.name = ['QSubtask ', m.name(end)];
-                    q_node.C = zeros(numel(mdp.S), 1); % Ci(s,a) from paper. Notice that i and a are specified by the q_node
-                    q_node.Q = zeros(numel(mdp.S), 1); % Qi(s,a) from paper
+
+                    q_node = self.init_q_node(max_node.i, i, 1.5, ['QSubtask ', m.name(end)]);
 
                     self.Q_nodes = [self.Q_nodes, q_node];
                     max_node.children = [max_node.children, numel(self.Q_nodes)];
@@ -172,6 +136,31 @@ classdef MAXQ < handle
 
             state.rs = [];
             state.pes = [];
+        end
+
+        function max_node = init_max_node(self, i, is_primitive, layer, name, I)
+            max_node = struct;
+            max_node.is_primitive = is_primitive;
+            max_node.layer = layer;
+            max_node.i = i;
+            max_node.name = name;
+            max_node.I = I; % internal "active" states (S in the paper) = all states labeled for the subtask
+            max_node.B = setdiff(self.mdp.S, max_node.I); % boundary "terminated" states (T in the paper)
+            max_node.V = zeros(numel(self.mdp.S), 1); % Vi(s) from paper = expected discounted reward (in subtask i only!) for starting in state s and following policy for i
+        end
+
+        function q_node = init_q_node(self, i, a, layer, name)
+            q_node = struct;
+            q_node.a = a; % child = primitive action i
+            q_node.layer = layer;
+            q_node.i = i;
+            q_node.idx = numel(self.Q_nodes) + 1;
+            q_node.name = name;
+            % note: (in subtask i only!) == in the state space defined by the internal states allowed in subtask i, that is all s in max_node.I
+            q_node.C = zeros(numel(self.mdp.S), 1); % Ci(s,a) from paper = expected discounted reward (in subtask i only!) *after* completing action/subtask a in state s and then following the policy for i (i.e. excluding the intermediary rewards from the states/actions of executing a). Notice that i and a are specified by the q_node
+            q_node.Q = zeros(numel(self.mdp.S), 1); % Qi(s,a) from paper = expected discounted reward (in subtask i only!) for completing action/subtask a in state s and then following the policy for i (i.e. including the intermediary rewards from the states/actions of executing a).
+            q_node.CC = zeros(numel(self.mdp.S), 1); % Ci~(s,a) = same as Ci but including pseudo-rewards for subtask i
+            q_node.QQ = zeros(numel(self.mdp.S), 1); % Qi~(s,a) = same as Qi but including pseudo-rewards for subtask i
         end
        
         % Iterative MaxQ-0

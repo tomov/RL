@@ -192,7 +192,7 @@ classdef MAXQ < handle
 
                 % Choose action / subroutine a
                 %
-                pi = self.glie(s, i, false);
+                pi = self.glie(s, i, pseudorewards);
                 j = samplePF(pi);
                 ia = q_children(j);
                 a = max_children(j);
@@ -292,7 +292,7 @@ classdef MAXQ < handle
                     % TODO implement all-states updating
                     %
 
-                    % first pick a* = best action following s' in subtask i (line 13 of Table 4: MAXQ-Q)
+                    % first pick a* = best action following s' in subtask i, using pseudorewards (locally) (line 13 of Table 4: MAXQ-Q)
                     %
                     [~, pseudoQ] = self.glie(new_s, i, true);
                     [~, j] = max(pseudoQ);
@@ -323,10 +323,14 @@ classdef MAXQ < handle
 
                 % Update V-value
                 %
-                [~, Q] = self.glie(s, i, false);
+                [~, Q] = self.glie(s, i, false); % do NOT use pseudorewards to calculate the real V-values
                 self.max_nodes{i}.V(s) = max(Q); % Eq 8: Vi(s) = max Qi(s,:)
 
                 fprintf('%s Qs = [%s], pe = %.2f, C = %.2f, V = %.2f, Rtot = %.2f, count = %d\n', spaces, sprintf('%.2f ', Q), pe, self.q_nodes{ia}.C(s), self.max_nodes{i}.V(s), stack(end).Rtot, stack(end).count);
+
+                % MOMCHIL'S HACKSAUCE
+                %
+                self.max_nodes{i}.pseudoR(new_s) = self.max_nodes{i}.pseudoR(new_s) - 1;
 
                 % Logging
                 %
@@ -628,7 +632,7 @@ classdef MAXQ < handle
                     max_node = max_nodes{i};
                     subplot(n, m, i + (l-1)*m + offs);
                     ri = max_node.pseudoR(self.mdp.I);
-                    imagesc(reshape(vi, size(self.map)));
+                    imagesc(reshape(ri, size(self.map)));
                     colormap('Gray');
                     if max_node.i == state.a
                         text(y, x, 'X', 'FontSize', x_font, 'FontWeight', 'bold', 'Color', 'red');

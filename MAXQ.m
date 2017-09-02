@@ -176,7 +176,7 @@ classdef MAXQ < handle
             i = state.i;
             count = state.count;
 
-            pseudorewards = true;
+            pseudorewards = true; % true = MAXQ-Q (pseudorewards), false = MAXQ-0 TODO parametrize (this but also parametrize the subtasks)
 
             max_node = self.max_nodes{i};
             q_children = max_node.children;
@@ -579,7 +579,7 @@ classdef MAXQ < handle
 
             % plot MAXQ graph + V- and Q-values
             %
-            n = 9;
+            n = 12;
             l = 0;
             for layer = 2:-1:0
                 % V values of max nodes
@@ -618,6 +618,31 @@ classdef MAXQ < handle
 
                     if i == 1, ylabel('V(s)'); end
                     title(sprintf('%s (%d)', max_node.name, max_node.i));
+                    axis off;
+                end
+
+                % Pseudorewards
+                %
+                l = l + 1;
+                for i = 1:numel(max_nodes)
+                    max_node = max_nodes{i};
+                    subplot(n, m, i + (l-1)*m + offs);
+                    ri = max_node.pseudoR(self.mdp.I);
+                    imagesc(reshape(vi, size(self.map)));
+                    colormap('Gray');
+                    if max_node.i == state.a
+                        text(y, x, 'X', 'FontSize', x_font, 'FontWeight', 'bold', 'Color', 'red');
+                    elseif max_node.i == state.i
+                        text(y, x, 'X', 'FontSize', x_font, 'FontWeight', 'bold', 'Color', 'white');
+                    elseif ismember(max_node.i, [stack.i])
+                        text(y, x, 'X', 'FontSize', x_font, 'FontWeight', 'bold', 'Color', 'black');
+                    end
+
+                    for ss = self.mdp.I
+                        [xx, yy] = ind2sub(size(self.map), ss);
+                        text(yy, xx, num2str(max_node.pseudoR(ss)), 'FontSize', v_font, 'Color', 'green');
+                    end
+                    title(sprintf('R~_%d', max_node.i));
                     axis off;
                 end
 
@@ -681,6 +706,7 @@ classdef MAXQ < handle
                         [xx, yy] = ind2sub(size(self.map), ss);
                         text(yy, xx, num2str(q_node.C(ss)), 'FontSize', v_font, 'Color', 'green');
                     end
+                    title(sprintf('C_%d(:,%d)', q_node.i, q_node.a));
 
                     if i == 1, ylabel('C(s,a)'); end
                     axis off;
@@ -694,14 +720,15 @@ classdef MAXQ < handle
                 for i = 1:numel(q_nodes)
                     q_node = q_nodes{i};
                     subplot(n, m, i + (l-1)*m + offs);
-                    ci = q_node.pseudoQ(self.mdp.I);
-                    imagesc(reshape(ci, size(self.map)));
+                    qi = q_node.pseudoQ(self.mdp.I);
+                    imagesc(reshape(qi, size(self.map)));
                     colormap('Gray');
                     if q_node.a == state.a && q_node.i == state.i
                         text(y, x, 'X', 'FontSize', x_font, 'FontWeight', 'bold', 'Color', 'red');
                     elseif find(q_node.a == [stack.a]) == find(q_node.i == [stack.i])
                         text(y, x, 'X', 'FontSize', x_font, 'FontWeight', 'bold', 'Color', 'black');
                     end
+                    title(sprintf('Q~_%d(:,%d)', q_node.i, q_node.a));
 
                     for ss = self.mdp.I
                         [xx, yy] = ind2sub(size(self.map), ss);

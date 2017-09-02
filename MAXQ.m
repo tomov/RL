@@ -255,7 +255,7 @@ classdef MAXQ < handle
 
                 assert(~ismember(s, self.max_nodes{i}.B)); % cannot update a boundary state
 
-                fprintf('%s ...back to maxQ0(i = %d, s = %d) after calling maxQ0(a = %d, s = %d): new_s = %d, r = %.2f, n = %d\n', spaces, i, s, a, s, new_s, stack(end).r, n);
+                fprintf('\n%s ...back to maxQ0(i = %d, s = %d) after calling maxQ0(a = %d, s = %d): new_s = %d, r = %.2f, n = %d\n', spaces, i, s, a, s, new_s, stack(end).r, n);
 
                 % Update locals 
                 %
@@ -280,6 +280,8 @@ classdef MAXQ < handle
                     % => Vi(s) = max_a Qi(s,a)
                     % => update Ci(s, a) using TD learning to converge to Vi(s') i.e. as if Vi(s') is its reward (it's the actual reward for primitive actions)
                     %
+                    % notice that the discounting for rewards after s' is taken into account in C
+                    %
                     r = (MDP.gamma ^ n) * self.max_nodes{i}.V(new_s);
                     pe = r - self.q_nodes{ia}.C(s); % Eq 10: PE = Vi(s') - Ci(s,a)
                     self.q_nodes{ia}.C(s) = self.q_nodes{ia}.C(s) + MDP.alpha * pe; % Eq 10: Ci(s,a) = Ci(s,a) + alpha * PE
@@ -292,28 +294,11 @@ classdef MAXQ < handle
 
                     % first pick a* = best action following s' in subtask i (line 13 of Table 4: MAXQ-Q)
                     %
-                    %{
-                    new_a = NaN; % a*
-                    new_ia = NaN;
-                    q_max = -Inf;
-                    for j = 1:numel(q_children)
-                        ia_candidate = q_children(j);
-                        a_candidate = max_children(j);
-                        %q_candidate = self.q_nodes{ia_candidate}.pseudoC(new_s) + self.max_nodes{a_candidate}.V(new_s); % a* = argmax_a' Ci~(s', a') + Va'(s') ?= argmax_a' Qi~(s', a') ?
-                        q_candidate = self.q_nodes{ia_candidate}.pseudoQ(new_s); % a* = argmax_a' Ci~(s', a') + Va'(s') ?= argmax_a' Qi~(s', a') ?
-                        fprintf('                                     ia'' %d, a'' %d, q_candidate %.2f, a* %d, q* %.2lf\n', ia_candidate, a_candidate, q_candidate, a_max, q_max);
-                        if q_candidate > q_max
-                            q_max = q_candidate;
-                            new_ia = ia_candidate;
-                            new_a = a_candidate;
-                            fprintf('                                                                          max\n');
-                        end
-                    end
-                    %}
-                    [~, pseudoQ] = self.glie(s, i, true);
+                    [~, pseudoQ] = self.glie(new_s, i, true);
                     [~, j] = max(pseudoQ);
                     new_ia = q_children(j);
                     new_a = max_children(j);
+                    fprintf('                   MAXQ-Q: pseudoQ = %s, j = %d, new_ia = %d, new_a = %d, new_s = %d\n', sprintf('%.2f ', pseudoQ), j, new_ia, new_a, new_s);
 
                     % Update (pseudoreward) C~ and Q~
                     % pseudo reward = pseudo reward at s' (in subtask i) + discounted reward for subtask a* at s' + discounted reward after subtask a* at s' (in subtask i)
@@ -336,6 +321,8 @@ classdef MAXQ < handle
                     fprintf('                   MAXQ-Q: r = %.2f, pe = %.2f, C = %.2f, Q = %.2f\n', r, pe, self.q_nodes{ia}.C(s), self.q_nodes{ia}.Q(s));
                 end
 
+                % Update V-value
+                %
                 [~, Q] = self.glie(s, i, false);
                 self.max_nodes{i}.V(s) = max(Q); % Eq 8: Vi(s) = max Qi(s,:)
 
@@ -592,7 +579,7 @@ classdef MAXQ < handle
 
             % plot MAXQ graph + V- and Q-values
             %
-            n = 7;
+            n = 9;
             l = 0;
             for layer = 2:-1:0
                 % V values of max nodes
@@ -696,6 +683,32 @@ classdef MAXQ < handle
                     end
 
                     if i == 1, ylabel('C(s,a)'); end
+                    axis off;
+                end
+
+                % pseudoQ values of Q nodes
+                %
+                m = max(8, numel(q_nodes));
+                offs = max(0, floor((8 - numel(q_nodes)) / 2));
+                l = l + 1;
+                for i = 1:numel(q_nodes)
+                    q_node = q_nodes{i};
+                    subplot(n, m, i + (l-1)*m + offs);
+                    ci = q_node.pseudoQ(self.mdp.I);
+                    imagesc(reshape(ci, size(self.map)));
+                    colormap('Gray');
+                    if q_node.a == state.a && q_node.i == state.i
+                        text(y, x, 'X', 'FontSize', x_font, 'FontWeight', 'bold', 'Color', 'red');
+                    elseif find(q_node.a == [stack.a]) == find(q_node.i == [stack.i])
+                        text(y, x, 'X', 'FontSize', x_font, 'FontWeight', 'bold', 'Color', 'black');
+                    end
+
+                    for ss = self.mdp.I
+                        [xx, yy] = ind2sub(size(self.map), ss);
+                        text(yy, xx, num2str(q_node.pseudoQ(ss)), 'FontSize', v_font, 'Color', 'green');
+                    end
+
+                    if i == 1, ylabel('Q~(s,a)'); end
                     axis off;
                 end
             end

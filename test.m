@@ -2,13 +2,13 @@
 map = [
     '............#...#.';
     '........#.#.#.#.#.';
-    '...S....#.#.#.#.#.';
+    '........#.#.#.#.#.';
     '........#.#.#.#.#.';
     '........#.#...#...';
     '.#####.####.#####.';
     '.$..........#.....';
     '..#..#......#.###.';
-    '.###.#..S.......#.';
+    '.###.#..........#.';
     '..#..#......#.###.';
     '.....#......#.....';
     '.#####.####.#####.';
@@ -31,6 +31,7 @@ map = [
     '.....'];
 %}
 
+%{
 M = MDP(map);
 rs_0 = [];
 for i = 1:100
@@ -38,6 +39,7 @@ for i = 1:100
     disp(r);
     rs_0 = [rs_0, r];
 end
+%}
 
 M = MDP(map, 0.9);
 rs_lambda = [];
@@ -49,13 +51,19 @@ end
 
 
 figure;
-plot(rs_0);
+plot(R_0);
 hold on;
-plot(rs_lambda);
+plot(R_lambda);
+plot(rs_lambda);  
 hold off;
-legend({'TD(0)', 'TD(\lambda)'});
+legend({'TD(0)', 'TD(\lambda)', 'TD(\lambda) ++'});
 
-%M.sampleAC_gui();
+
+%%
+%
+
+M = MDP(map, 0.9);
+M.sampleAC_gui();
 
 
 %% Options framework
@@ -77,5 +85,14 @@ fprintf('\n\n\n\n\n\n\n\n--------------------------------- HSM -----------------
 S = SMDP(map, true);
 %S.sampleQ(find(map == 'X'), true);
 S.sampleQ_gui();
+
+
+%% HMLMDP
+%
+
+
+H = HMLMDP(map, true, 9);
+%H.sample();
+H.sample_gui();
 
 

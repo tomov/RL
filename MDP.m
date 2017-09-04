@@ -789,8 +789,27 @@ classdef MDP < handle
         % used for actor-critic
         %
         function p = softmax(self, s)
-            p = exp(self.H(s, :));
+            h = self.H(s, :);
+            %{
+            e = self.E_Q(s, :);
+            scale = mean(abs(h(~isinf(h)))) / mean(e);
+            if ~isinf(scale) && ~isnan(scale)
+                h = h - e * scale;
+            end
+            %}
+            p = exp(h);
             p = p / sum(p);
+        end
+
+        % Get PVFs as in Machado et al (2017)
+        %
+        function pvfs = get_pvfs(self)
+            A = sum(self.P, 3);
+            D = diag(sum(A, 2));
+            L = D - A; % combinatorial graph Laplacian
+            %L = (pinv(D) ^ 0.5) * (L - A) * (pinv(D) ^ 0.5); % normalized graph Laplacian
+            [Q, Lambda] = eig(L);
+            pvfs = Q;
         end
 
         % Convert from maze position to internal state

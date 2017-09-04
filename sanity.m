@@ -219,29 +219,26 @@ map = [
     '.....'];
 %M = MDP_maze(map);
 M = MDP_maze(map, 0.9);
-M.sampleAC_gui();
 
-%{
-M.sampleQ_gui();
+
 for i = 1:20
-    M.sampleSARSA(find(map == 'X'), true);
+    M.sampleSARSA(find(map == 'X'));
 end
 M.sampleSARSA_gui();
 
 for i = 1:20
-    M.sampleQ(find(map == 'X'), true);
+    M.sampleQ(find(map == 'X'));
 end
-M.sampleQ_gui();
+M.sampleQ_gui(find(map == 'X'));
 
 for i = 1:20
-    M.sampleAC(find(map == 'X'), true);
+    M.sampleAC(find(map == 'X'));
 end
-M.sampleAC_gui();
+M.sampleAC_gui(find(map == 'X'));
 
 M.solveGPI();
-M.sampleGPI();
-M.sampleGPI_gui();
-%}
+M.sampleGPI(find(map == 'X'));
+M.sampleGPI_gui(find(map == 'X'));
 
 
 %% Options framework

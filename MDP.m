@@ -104,9 +104,6 @@ classdef MDP < handle
         end
 
         function state = init_sampleGPI(self, s)
-            if ~exist('s', 'var')
-                s = find(self.map == self.agent_symbol);
-            end
             assert(numel(find(self.I == s)) == 1);
 
             state.Rtot = 0;
@@ -161,9 +158,6 @@ classdef MDP < handle
         end
 
         function state = init_sampleSARSA(self, s)
-            if ~exist('s', 'var')
-                s = find(self.map == self.agent_symbol);
-            end
             assert(numel(find(self.I == s)) == 1);
 
             state.Rtot = 0;
@@ -224,9 +218,6 @@ classdef MDP < handle
         end
 
         function state = init_sampleQ(self, s)
-            if ~exist('s', 'var')
-                s = find(self.map == self.agent_symbol);
-            end
             assert(numel(find(self.I == s)) == 1);
 
             state.Rtot = 0;
@@ -287,9 +278,6 @@ classdef MDP < handle
         end
 
         function state = init_sampleAC(self, s)
-            if ~exist('s', 'var')
-                s = find(self.map == self.agent_symbol);
-            end
             assert(numel(find(self.I == s)) == 1);
 
             state.Rtot = 0;
@@ -317,8 +305,10 @@ classdef MDP < handle
             state.path = [state.path, s];
 
             new_s = samplePF(self.P(:,s,a));
-            pi = self.softmax(new_s);
-            new_a = samplePF(pi);
+            if ~ismember(new_s, self.B)
+                pi = self.softmax(new_s);
+                new_a = samplePF(pi);
+            end
        
             r = self.R(new_s);
             pe = r + self.gamma * self.V(new_s) - self.V(s);
@@ -346,52 +336,25 @@ classdef MDP < handle
             else
                 % Internal state
                 %
-                state.s = new_s;
                 state.a = new_a;
                 state.r = r;
                 state.pe = pe;
                 state.pi = pi;
             end
+
+            state.s = new_s;
             state.rs = [state.rs, r];
             state.pes = [state.pes, pe];
         end
 
         % Generic function that samples paths given a state initializer and a step function
         %
-        function [Rtot, path] = sample_helper(self, init_fn, step_fn, s, do_print)
-            if ~exist('s', 'var')
-                state = init_fn();
-            else
-                state = init_fn(s);
-            end
-            if ~exist('do_print', 'var')
-                do_print = false;
-            end
+        function [Rtot, path] = sample_helper(self, init_fn, step_fn, s)
+            state = init_fn(s);
 
-            map = self.map;
-            if do_print, disp(map); end
             while numel(state) > 1 || ~state.done
-                if numel(state) == 1 % else MAXQ... TODO cleanup
-                    [x, y] = self.I2pos(state.s);
-                    old_s = state.s;
-                    old_a = state.a;
-                end
-               
                 state = step_fn(state); 
-
-                if numel(state) == 1 % else MAXQ... TODO cleanup
-                    if state.done
-                        if do_print, fprintf('(%d, %d), %d --> END [%.2f%%]\n', x, y, old_a, self.P(state.s, old_s, old_a) * 100); end
-                    else
-                        [new_x, new_y] = self.I2pos(state.s);
-                        map(x, y) = self.empty_symbol;
-                        map(new_x, new_y) = self.agent_symbol;
-                        if do_print, fprintf('(%d, %d), %d --> (%d, %d) [%.2f%%]\n', x, y, old_a, new_x, new_y, self.P(state.s, old_s, old_a) * 100); end
-                        if do_print, disp(map); end
-                    end
-                end
             end
-            if do_print, fprintf('Total reward: %d\n', state.Rtot); end
 
             Rtot = state.Rtot;
             path = state.path;
@@ -431,6 +394,31 @@ classdef MDP < handle
             %L = (pinv(D) ^ 0.5) * (L - A) * (pinv(D) ^ 0.5); % normalized graph Laplacian
             [Q, Lambda] = eig(L);
             pvfs = Q;
+        end
+
+        %
+        % Boilderplate for sampling paths using the GUI
+        % sample_gui_helper must be defined by the class that implements the MDP
+        %
+
+        function sampleGPI_gui(varargin)
+            self = varargin{1};
+            self.sample_gui_helper(@self.init_sampleGPI, @self.stepGPI, varargin{2:end});
+        end
+
+        function sampleSARSA_gui(varargin)
+            self = varargin{1};
+            self.sample_gui_helper(@self.init_sampleSARSA, @self.stepSARSA, varargin{2:end});
+        end
+
+        function sampleQ_gui(varargin)
+            self = varargin{1};
+            self.sample_gui_helper(@self.init_sampleQ, @self.stepQ, varargin{2:end});
+        end
+
+        function sampleAC_gui(varargin)
+            self = varargin{1};
+            self.sample_gui_helper(@self.init_sampleAC, @self.stepAC, varargin{2:end});
         end
 
     end % end methods

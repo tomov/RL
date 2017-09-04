@@ -47,10 +47,10 @@ classdef SMDP < handle
             %
 
 			subtask_inds = find(map == SMDP.subtask_symbol)';
-            goal_inds = find(ismember(map, MDP.absorbing_symbols));
+            goal_inds = find(ismember(map, MDP_maze.absorbing_symbols));
 
-			map(subtask_inds) = MDP.empty_symbol; % erase subtask states
-			map(goal_inds) = MDP.empty_symbol; % erase goal states
+			map(subtask_inds) = MDP_maze.empty_symbol; % erase subtask states
+			map(goal_inds) = MDP_maze.empty_symbol; % erase goal states
 
             O = 1:numel(subtask_inds); 
             self.pi = cell(numel(O), 1); % set of policies for each option
@@ -64,7 +64,7 @@ classdef SMDP < handle
                 %
                 map(s) = SMDP.pseudoreward_symbol;
 
-                smdp = MDP(map);
+                smdp = MDP_maze(map);
                 if ~is_hsm
                     smdp.solveGPI(); % in regular Options framework, we assume the policies of the subtasks are given
                 end
@@ -73,7 +73,7 @@ classdef SMDP < handle
                 self.pi{o} = smdp.pi; % policy for option o corresponding to subtask with goal state s
                 self.smdp{o} = smdp;
 
-                map(s) = MDP.empty_symbol;
+                map(s) = MDP_maze.empty_symbol;
 			end
             self.is_hsm = is_hsm;
 
@@ -84,7 +84,7 @@ classdef SMDP < handle
             map = self.map;
             map(subtask_inds) = '.'; % erase subtask states
 
-            mdp = MDP(map);
+            mdp = MDP_maze(map);
 
             O = numel(mdp.A) + 1 : numel(mdp.A) + numel(subtask_inds); % set of options = set of subtasks = set of subtask goal states; immediately follow the regular actions in indexing
             mdp.A = [mdp.A, O]; % augment actions with options
@@ -99,10 +99,22 @@ classdef SMDP < handle
                 mdp.P(s, :, a) = 1; % from wherever we take the option, we end up at its goal state (b/c its policy is deterministic)
                 mdp.P(s, s, a) = 0; % ...except from its goal state -- can't take the option there (makes no sense)
             end
-            % sanity check them
-            p = sum(mdp.P, 1);
-            p = p(:);
-            assert(sum(abs(p - 1) < 1e-8 | abs(p) < 1e-8) == numel(p));
+
+            % Normalize transition probabilities and mark some actions as illegal
+            %
+            for s = mdp.S
+                for a = mdp.A
+                    %if sum(P(:, s, a)) == 0
+                    %    P(s, s, a) = 1; % impossible moves keep you stationary
+                    %end
+                    if sum(mdp.P(:, s, a)) > 0 % allowed action
+                        assert(abs(sum(mdp.P(:, s, a)) - 1) < 1e-8);
+                    else % disallowed action
+                        mdp.H(s, a) = -Inf;
+                        mdp.Q(s, a) = -Inf;
+                    end
+                end
+            end
 
             mdp.R(mdp.I) = SMDP.R_I; % penalty for staying still
 

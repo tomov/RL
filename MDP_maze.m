@@ -1,5 +1,4 @@
-% TD-learning (SARSA, Q-learning, and actor-critic) as in Sutton & Barto (2013)
-% For 'rooms' domain only
+% TD-learning for 'rooms' domain only
 %
 classdef MDP_maze < MDP
 
@@ -43,7 +42,7 @@ classdef MDP_maze < MDP
             if ~exist('lambda', 'var')
                 lambda = 0;
             end
-            self = self@MDP(lambda)
+            self = self@MDP(lambda);
             self.map = map;
 
             absorbing_inds = find(ismember(map, self.absorbing_symbols)); % goal squares = internal states with corresponding boundary states
@@ -82,7 +81,7 @@ classdef MDP_maze < MDP
                     assert(ismember(s, S));
                     assert(ismember(s, I));
                     
-                    R(s) = self.R_I; % time is money for internal states
+                    R(s) = MDP_maze.R_I; % time is money for internal states
 
                     if ismember(map(x, y), self.impassable_symbols)
                         % Impassable state e.g. wall -> no neighbors
@@ -139,7 +138,7 @@ classdef MDP_maze < MDP
                         end   
                     end
 
-                    % Normalize transition probabilities
+                    % Normalize transition probabilities and mark some actions as illegal
                     %
                     for a = A
                         %if sum(P(:, s, a)) == 0
@@ -167,39 +166,14 @@ classdef MDP_maze < MDP
         end
 
         %
-        % Boilderplate for sampling paths using the GUI
-        %
-
-        function sampleGPI_gui(varargin)
-            self = varargin{1};
-            self.sample_gui_helper(@self.init_sampleGPI, @self.stepGPI, varargin{2:end});
-        end
-
-        function sampleSARSA_gui(varargin)
-            self = varargin{1};
-            self.sample_gui_helper(@self.init_sampleSARSA, @self.stepSARSA, varargin{2:end});
-        end
-
-        function sampleQ_gui(varargin)
-            self = varargin{1};
-            self.sample_gui_helper(@self.init_sampleQ, @self.stepQ, varargin{2:end});
-        end
-
-        function sampleAC_gui(varargin)
-            self = varargin{1};
-            self.sample_gui_helper(@self.init_sampleAC, @self.stepAC, varargin{2:end});
-        end
-
-        %
         % Generic function that samples paths using a nice GUI
         %
 
         function sample_gui_helper(self, init_fn, step_fn, s)
             if ~exist('s', 'var')
-                self.gui_state = init_fn();
-            else
-                self.gui_state = init_fn(s);
+                s = find(self.map == 'X');
             end
+            self.gui_state = init_fn(s);
 
 			self.gui_map = figure;
             self.plot_gui();
@@ -236,20 +210,24 @@ classdef MDP_maze < MDP
                 return
             end
 
-            [x, y] = self.I2pos(self.gui_state.s);
-            old_s = self.gui_state.s;
-            old_a = self.gui_state.a;
+            if numel(self.gui_state) == 1 % else MAXQ... TODO cleanup
+                [x, y] = self.I2pos(self.gui_state.s);
+                old_s = self.gui_state.s;
+                old_a = self.gui_state.a;
+            end
 
             self.gui_state = step_fn(self.gui_state);
             self.plot_gui();
 
-            if self.gui_state.done
-                fprintf('(%d, %d), %d --> END [%.2f%%]\n', x, y, old_a, self.P(self.gui_state.s, old_s, old_a) * 100);
-            else
-                [new_x, new_y] = self.I2pos(self.gui_state.s);
-                map(x, y) = self.empty_symbol;
-                map(new_x, new_y) = self.agent_symbol;
-                fprintf('(%d, %d), %d --> (%d, %d) [%.2f%%]\n', x, y, old_a, new_x, new_y, self.P(self.gui_state.s, old_s, old_a) * 100);
+            if numel(self.gui_state) == 1 % else MAXQ... TODO cleanup
+                if self.gui_state.done
+                    fprintf('(%d, %d), %d --> END [%.2f%%]\n', x, y, old_a, self.P(self.gui_state.s, old_s, old_a) * 100);
+                else
+                    [new_x, new_y] = self.I2pos(self.gui_state.s);
+                    map(x, y) = self.empty_symbol;
+                    map(new_x, new_y) = self.agent_symbol;
+                    fprintf('(%d, %d), %d --> (%d, %d) [%.2f%%]\n', x, y, old_a, new_x, new_y, self.P(self.gui_state.s, old_s, old_a) * 100);
+                end
             end
         end
 
@@ -277,32 +255,37 @@ classdef MDP_maze < MDP
 
         % Plot the GUI
         %
+        function plot_helper(self, what, tit, xlab, ylab)
+            imagesc(reshape(what, size(self.map)));
+            xlabel(xlab);
+            ylabel(ylab);
+            title(tit);
+            s = self.gui_state.s;
+            if ismember(s, self.B)
+                s = self.gui_state.path(end-1);
+            end
+            [x, y] = ind2sub(size(self.map), s);
+            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
+        end
+
         function plot_gui(self)
             figure(self.gui_map);
+
+            score = sprintf('Total reward: %.2f, steps: %d', self.gui_state.Rtot, numel(self.gui_state.path));
+            if self.gui_state.done
+                score = ['FINISHED!: ', score];
+            end
 
             % plot map and rewards
             %
             subplot(2, 8, 1);
-            m = self.map == '#';
-            imagesc(reshape(m, size(self.map)));
+            self.plot_helper(self.map == '#', 'map', score, self.gui_state.method);
             % goals
             goals = find(self.map == '$');
             for g = goals
                 [x, y] = ind2sub(size(self.map), g);
                 text(y, x, '$', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'green');
             end
-            % agent
-            [x, y] = ind2sub(size(self.map), self.gui_state.s);
-            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
-            % label
-            label = sprintf('Total reward: %.2f, steps: %d', self.gui_state.Rtot, numel(self.gui_state.path));
-            if self.gui_state.done
-                xlabel(['FINISHED!: ', label]);
-            else
-                xlabel(label);
-            end
-            ylabel(self.gui_state.method);
-            title('map');
 
             % heat map of visited states
             %
@@ -313,46 +296,27 @@ classdef MDP_maze < MDP
                     v(s) = v(s) + 1;
                 end
             end
-            imagesc(reshape(v, size(self.map)));
-            title('visited');
+            self.plot_helper(v, 'visited', '', '');
 
             % plot map and current state-value f'n V(s)
             %
             subplot(2, 8, 3);
-            vi = self.V(self.I);
-            imagesc(reshape(vi, size(self.map)));
-            [x, y] = ind2sub(size(self.map), self.gui_state.s);
-            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
-            title('state-value function V(.)');
+            self.plot_helper(self.V(self.I), 'V(s)', '', '');
 
             % current state-value eligibility trace f'n E(s)
             %
             subplot(2, 8, 4);
-            ei = self.E_V(self.I);
-            imagesc(reshape(ei, size(self.map)));
-            [x, y] = ind2sub(size(self.map), self.gui_state.s);
-            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
-            title('state-value eligibility traces E(.)');
+            self.plot_helper(self.E_V(self.I), 'E_V(s)', '', '');
 
             % current action-value eligibility trace f'n E(s)
             %
             subplot(2, 8, 5);
-            ei = sum(self.E_Q(self.I, :), 2);
-            imagesc(reshape(ei, size(self.map)));
-            [x, y] = ind2sub(size(self.map), self.gui_state.s);
-            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
-            title('action-value eligibility traces E(.,.)');
-
+            self.plot_helper(sum(self.E_Q(self.I, :), 2), 'sum E_Q(s,.)', '', '');
 
             % plot map and current action-value f'n max Q(s, a)
             %
             subplot(2, 8, 6);
-            qi = self.Q(self.I, :);
-            qi = max(qi, [], 2);
-            imagesc(reshape(qi, size(self.map)));
-            [x, y] = ind2sub(size(self.map), self.gui_state.s);
-            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
-            title('action-value function max_a Q(.,a)');
+            self.plot_helper(max(self.Q(self.I, :), [], 2), 'max Q(s,.)', '', '');
 
             % plot map and transition probability across all possible actions, P(.|s)
             %
@@ -360,19 +324,13 @@ classdef MDP_maze < MDP
             pi = self.gui_state.pi';
             p = squeeze(self.P(self.I, self.gui_state.s, :));
             p = p * pi;
-            imagesc(reshape(p, size(self.map)));
-            [x, y] = ind2sub(size(self.map), self.gui_state.s);
-            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
-            title('policy P(.|s)');
+            self.plot_helper(p, 'policy \pi = P(s''|s)', '', '');
 
             % plot map and current transition probability given the selected action, P(.|s,a)
             %
             subplot(2, 8, 8);
             p = self.P(self.I, self.gui_state.s, self.gui_state.a);
-            imagesc(reshape(p, size(self.map)));
-            [x, y] = ind2sub(size(self.map), self.gui_state.s);
-            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
-            title('transition probability for chosen action P(.|s,a)');
+            self.plot_helper(p, 'P(s''|s,a)', '', '');
 
             % plot reward / PE history
             %

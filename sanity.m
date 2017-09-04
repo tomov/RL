@@ -217,11 +217,12 @@ map = [
     '$####';
     '.#..X';
     '.....'];
-M = MDP(map);
-%M = MDP(map, 0.9);
+%M = MDP_maze(map);
+M = MDP_maze(map, 0.9);
+M.sampleAC_gui();
 
-M.sampleQ_gui();
 %{
+M.sampleQ_gui();
 for i = 1:20
     M.sampleSARSA(find(map == 'X'), true);
 end

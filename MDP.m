@@ -8,10 +8,10 @@ classdef MDP < handle
         % General
         % 
         R_I = -1; % penalty for staying in one place
-        alpha = 0.5; % learning rate
+        alpha = 0.1; % learning rate
         gamma = 0.9; % discount rate
         eps = 0.1; % eps for eps-greedy
-        beta = 0.5; % learning rate for policy (actor-critic)
+        beta = 0.1; % learning rate for policy (actor-critic)
         GPI_threshold = 0.1; % threshold for convergence of V(s) during policy evaluation
 
         % Maze
@@ -28,12 +28,12 @@ classdef MDP < handle
         % each row = [dx, dy, non-normalized P(s'|s)]
         % => random walk, but also bias towards staying in 1 place
         %
-        adj = [0, 0; ...
+        adj = [ ...
             -1, 0; ...
             0, -1; ...
             1, 0; ...
             0, 1];
-        A_names = {'stay', 'up', 'left', 'down', 'right', 'eat'};
+        A_names = {'up', 'left', 'down', 'right', 'eat'};
     end
 
     properties (Access = public)
@@ -50,6 +50,10 @@ classdef MDP < handle
         H = []; % H(s, a) = modifiable policy parameters, for actor-critic 
         pi = []; % pi(s) = policy = what action to take in state s (deterministic), for policy iteration
 
+        lambda = 0; % constant for eligibility traces
+        E_V = []; % E(s) = eligibility trace for state values
+        E_Q = []; % E(s, a) = eligibility trace for action values
+
         % Maze stuff
         %
         map = [];
@@ -65,8 +69,12 @@ classdef MDP < handle
 
         % Initialize an MDP from a maze
         %
-        function self = MDP(map)
+        function self = MDP(map, lambda)
             self.map = map; % so we can use pos2I
+            if ~exist('lambda', 'var')
+                lambda = 0;
+            end
+            self.lambda = lambda;
 
             absorbing_inds = find(ismember(map, self.absorbing_symbols)); % goal squares = internal states with corresponding boundary states
             I_with_B = absorbing_inds;
@@ -87,10 +95,12 @@ classdef MDP < handle
             I2B(I_with_B) = B; % mapping from I states to corresponding B states
 
             P = zeros(N, N, numel(A)); % transitions P(s'|s,a); defaults to 0
-            Q = zeros(N, numel(A)); % Q-values Q(s, a)
-            V = zeros(N, 1); % V-values V(s)
+            Q = zeros(N, numel(A)); % action values Q(s, a)
+            V = zeros(N, 1); % state values V(s)
             H = zeros(N, numel(A)); % policy parameters
             R = nan(N, 1); % instantaneous reward f'n R(s)
+            E_V = zeros(N, 1); % eligibility traces E(s) for state values
+            E_Q = zeros(N, numel(A)); % eligibility traces E(s, a) for action values
           
             assert(size(MDP.adj, 1) + 1 == numel(A));
             % iterate over all internal states s
@@ -143,7 +153,7 @@ classdef MDP < handle
                         assert(ismember(map(x, y), self.absorbing_symbols));
 
                         b = I2B(s);
-                        P(b, s, 6) = 1; % action 6 = pick up reward
+                        P(b, s, end) = 1; % last action = pick up reward
                         
                         % Get the reward for the boundary state
                         %
@@ -162,10 +172,15 @@ classdef MDP < handle
                     % Normalize transition probabilities
                     %
                     for a = A
-                        if sum(P(:, s, a)) == 0
-                            P(s, s, a) = 1; % impossible moves keep you stationary
+                        %if sum(P(:, s, a)) == 0
+                        %    P(s, s, a) = 1; % impossible moves keep you stationary
+                        %end
+                        if sum(P(:, s, a)) > 0 % allowed action
+                            P(:, s, a) = P(:, s, a) / sum(P(:, s, a)); % normalize P(.|s,a)
+                        else % disallowed action
+                            H(s, a) = -Inf;
+                            Q(s, a) = -Inf;
                         end
-                        P(:, s, a) = P(:, s, a) / sum(P(:, s, a)); % normalize P(.|s,a)
                     end
                 end
             end
@@ -177,6 +192,8 @@ classdef MDP < handle
             self.Q = Q;
             self.V = V;
             self.H = H;
+            self.E_V = E_V;
+            self.E_Q = E_Q;
         end
 
         % Solve using generalized policy iteration.
@@ -477,8 +494,20 @@ classdef MDP < handle
        
             r = self.R(new_s);
             pe = r + self.gamma * self.V(new_s) - self.V(s);
-            self.V(s) = self.V(s) + self.alpha * pe;
-            self.H(s, a) = self.H(s, a) + self.beta * pe;
+
+            % TD(0) -- for sanity checks
+            %self.V(s) = self.V(s) + self.alpha * pe;
+            %self.H(s, a) = self.H(s, a) + self.beta * pe;
+
+            % update state values
+            self.E_V(s) = self.E_V(s) + 1;
+            self.V = self.V + self.alpha * pe * self.E_V;
+            self.E_V = self.E_V * self.gamma * self.lambda;
+
+            % update policies
+            self.E_Q(s, a) = self.E_Q(s, a) + 1;
+            self.H = self.H + self.beta * pe * self.E_Q;
+            self.E_Q = self.E_Q * self.gamma * self.lambda;
             
             if ismember(new_s, self.B)
                 % Boundary state
@@ -630,25 +659,73 @@ classdef MDP < handle
         function plot_gui(self)
             figure(self.gui_map);
 
-            % plot map and current state-value f'n V(s)
+            % plot map and rewards
             %
-            subplot(2, 4, 1);
-            vi = self.V(self.I);
-            imagesc(reshape(vi, size(self.map)));
+            subplot(2, 8, 1);
+            m = self.map == '#';
+            imagesc(reshape(m, size(self.map)));
+            % goals
+            goals = find(self.map == '$');
+            for g = goals
+                [x, y] = ind2sub(size(self.map), g);
+                text(y, x, '$', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'green');
+            end
+            % agent
             [x, y] = ind2sub(size(self.map), self.gui_state.s);
             text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
+            % label
             label = sprintf('Total reward: %.2f, steps: %d', self.gui_state.Rtot, numel(self.gui_state.path));
             if self.gui_state.done
                 xlabel(['FINISHED!: ', label]);
             else
                 xlabel(label);
             end
-            title('state-value function V(.)');
             ylabel(self.gui_state.method);
+            title('map');
+
+            % heat map of visited states
+            %
+            subplot(2, 8, 2);
+            v = zeros(size(self.map));
+            for s = self.gui_state.path
+                if s <= numel(self.map) % i.e. s in I
+                    v(s) = v(s) + 1;
+                end
+            end
+            imagesc(reshape(v, size(self.map)));
+            title('visited');
+
+            % plot map and current state-value f'n V(s)
+            %
+            subplot(2, 8, 3);
+            vi = self.V(self.I);
+            imagesc(reshape(vi, size(self.map)));
+            [x, y] = ind2sub(size(self.map), self.gui_state.s);
+            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
+            title('state-value function V(.)');
+
+            % current state-value eligibility trace f'n E(s)
+            %
+            subplot(2, 8, 4);
+            ei = self.E_V(self.I);
+            imagesc(reshape(ei, size(self.map)));
+            [x, y] = ind2sub(size(self.map), self.gui_state.s);
+            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
+            title('state-value eligibility traces E(.)');
+
+            % current action-value eligibility trace f'n E(s)
+            %
+            subplot(2, 8, 5);
+            ei = sum(self.E_Q(self.I, :), 2);
+            imagesc(reshape(ei, size(self.map)));
+            [x, y] = ind2sub(size(self.map), self.gui_state.s);
+            text(y, x, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
+            title('action-value eligibility traces E(.,.)');
+
 
             % plot map and current action-value f'n max Q(s, a)
             %
-            subplot(2, 4, 2);
+            subplot(2, 8, 6);
             qi = self.Q(self.I, :);
             qi = max(qi, [], 2);
             imagesc(reshape(qi, size(self.map)));
@@ -658,7 +735,7 @@ classdef MDP < handle
 
             % plot map and transition probability across all possible actions, P(.|s)
             %
-            subplot(2, 4, 3);
+            subplot(2, 8, 7);
             pi = self.gui_state.pi';
             p = squeeze(self.P(self.I, self.gui_state.s, :));
             p = p * pi;
@@ -669,7 +746,7 @@ classdef MDP < handle
 
             % plot map and current transition probability given the selected action, P(.|s,a)
             %
-            subplot(2, 4, 4);
+            subplot(2, 8, 8);
             p = self.P(self.I, self.gui_state.s, self.gui_state.a);
             imagesc(reshape(p, size(self.map)));
             [x, y] = ind2sub(size(self.map), self.gui_state.s);
@@ -681,7 +758,7 @@ classdef MDP < handle
             rs = self.gui_state.rs;
             pes = self.gui_state.pes;
             %path = self.gui_state.path; <-- differs for SMDP
-            hist = 100;
+            hist = 10000;
             if numel(rs) > hist
                 rs = rs(end-hist:end);
                 pes = pes(end-hist:end);

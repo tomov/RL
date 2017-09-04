@@ -52,21 +52,48 @@ kalman-TD?
 successor-feature approach (Barreto 2016?)
 
 
-GOALS FOR TODAY:
+CODE:
 
-pseudorewards for maxq
-rm illegal actions (going to subtask that's not allowed) -> replace w/ pseudorewards
-my R~-- scheme
-
-
-
+TD(lambda)
 
 make hmlmdp's local and online
 
+options with actor-critic
+- include reward R + R~ in calculating option policy?
 
-maxq -- all states updating
+taxi domain
+
+intra-option learning and whatnot from Sutton:
 
 
+
+IDEAS:
+
+SARSA for option discovery (s,a) --> (s', a')
+Bayesian RL ? => for credit assignment
+salience, novelty
+
+EXPERIMENTS:
+
+"which of these two situations is more valuable?"
+
+PAPERS:
 
 finding the options? -- laplace
+Variable-reward hierarchical reinforcement learning (Mehta et al., 2008)   <-------- !!!!
+Wilson et al. (2007) consider learning in a hierarchical Bayesian RL <--- !!! bayesian prior distribution over tasks
+HAM framework
+look into bayesian RL
 
+
+----------------------------
+
+
+maybe focus on Options first? play around w/ them?
+
+maybe actually create tasks for yourself and play around w/ them? observe your behavior #introspection
+
+to start with (for andrew's thing):
+- everything deterministic
+
+    m

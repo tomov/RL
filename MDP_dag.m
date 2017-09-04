@@ -105,6 +105,7 @@ classdef MDP_dag < MDP
             self.S_names = S_names;
             self.I = I;
             self.B = B;
+            self.A = A;
             self.P = P;
             self.R = R;
             self.Q = Q;
@@ -205,29 +206,32 @@ classdef MDP_dag < MDP
             end
 
             subplot(2, 8, 1);
+            self.plot_helper(self.R, 'R', score, self.gui_state.method);
+
+            subplot(2, 8, 2);
             v = zeros(numel(self.S), 1);
             for s = self.gui_state.path
                 v(s) = v(s) + 1;
             end
-            self.plot_helper(v, 'visited', score, self.gui_state.method);
-
-            subplot(2, 8, 2);
-            self.plot_helper(self.V, 'V(s)', '', '');
+            self.plot_helper(v, 'visited', '', '');
 
             subplot(2, 8, 3);
-            self.plot_helper(self.E_V, 'E_V(s)', '', '');
+            self.plot_helper(self.V, 'V(s)', '', '');
 
             subplot(2, 8, 4);
+            self.plot_helper(self.E_V, 'E_V(s)', '', '');
+
+            subplot(2, 8, 5);
             self.plot_helper(sum(self.E_Q, 2), 'sum E_Q(s,.)', '', '');
 
             % plot map and current action-value f'n max Q(s, a)
             %
-            subplot(2, 8, 5);
+            subplot(2, 8, 6);
             self.plot_helper(max(self.Q, [], 2), 'max Q(s,.)', '', '');
 
             % plot map and transition probability across all possible actions, P(.|s)
             %
-            subplot(2, 8, 6);
+            subplot(2, 8, 7);
             pi = self.gui_state.pi';
             p = squeeze(self.P(:, self.gui_state.s, :));
             p = p * pi;
@@ -235,7 +239,7 @@ classdef MDP_dag < MDP
 
             % plot map and current transition probability given the selected action, P(.|s,a)
             %
-            subplot(2, 8, 7);
+            subplot(2, 8, 8);
             p = self.P(:, self.gui_state.s, self.gui_state.a);
             self.plot_helper(p, 'P(s''|s,a)', '', '');
 

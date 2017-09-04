@@ -250,9 +250,11 @@ map = [
     '$####';
     'S#..X';
     '..S..'];
-S = SMDP(map);
+S = SMDP();
+S.init_from_maze(map);
+
 %S.sampleQ(find(map == 'X'), true);
-S.sampleQ_gui();
+S.sampleAC_gui();
 
 
 %% Big options framework
@@ -272,7 +274,8 @@ map = [
     '..#S.#.....';
     '.0.....S#..';
     '.....#..$..'];
-S = SMDP(map);
+S = SMDP();
+S.init_from_maze(map);
 %O.sampleQ(find(map == 'X'), true);
 %O.sampleQ();
 S.sampleQ_gui();
@@ -288,9 +291,11 @@ map = [
     '$####';
     'S#..X';
     '..S..'];
-S = SMDP(map, true);
+S = SMDP(true);
+S.init_from_maze(map);
 %S.sampleQ(find(map == 'X'), true);
-S.sampleQ_gui();
+%S.sampleQ_gui(find(map == 'X'));
+S.sampleAC_gui(find(map == 'X'));
 
 
 

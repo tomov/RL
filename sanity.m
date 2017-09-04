@@ -218,6 +218,7 @@ map = [
     '.#..X';
     '.....'];
 M = MDP(map);
+%M = MDP(map, 0.9);
 
 M.sampleQ_gui();
 %{

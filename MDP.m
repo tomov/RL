@@ -479,6 +479,9 @@ classdef MDP < handle
             state.method = 'AC';
             state.r = 0;
             state.pe = 0;
+
+            self.E_V(:) = 0;
+            self.E_Q(:) = 0;
         end
 
         function state = stepAC(self, state)

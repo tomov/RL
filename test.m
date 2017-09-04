@@ -39,7 +39,7 @@ for i = 1:100
     rs_0 = [rs_0, r];
 end
 
-M = MDP(map, 0.99);
+M = MDP(map, 0.9);
 rs_lambda = [];
 for i = 1:100
     [r, path] = M.sampleAC(find(map == 'X'), false);

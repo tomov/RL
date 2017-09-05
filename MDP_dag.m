@@ -19,9 +19,12 @@ classdef MDP_dag < MDP
 
         % Initialize an MDP from a DAG
         %
-        function self = MDP_dag(next_keys, next_values, rewards, lambda)
+        function self = MDP_dag(next_keys, next_values, rewards, terminal, lambda)
             if ~exist('lambda', 'var')
                 lambda = 0;
+            end
+            if ~exist('terminal', 'var')
+                terminal = {};
             end
             self = self@MDP(lambda);
 
@@ -50,7 +53,8 @@ classdef MDP_dag < MDP
 
             % find boundary states B and internal states I
             %
-            B = find(~ismember(S_names, next_keys));
+            B = find(~ismember(S_names, next_keys)); % states that lead to nowhere
+            B = union(B, find(ismember(S_names, terminal))); % states that were explicitly designated as terminal
             I = setdiff(S, B);
 
             % set up transition matrix P
@@ -113,6 +117,20 @@ classdef MDP_dag < MDP
             self.H = H;
             self.E_V = E_V;
             self.E_Q = E_Q;
+        end
+
+        % add terminal states
+        %
+        function add_terminal(self, terminal) 
+            self.B = union(self.B, find(ismember(self.S_names, terminal)));
+            self.I = setdiff(self.S, self.B);
+        end
+
+        % remove terminal states
+        %
+        function remove_terminal(self, terminal) 
+            self.B = setdiff(self.B, find(ismember(self.S_names, terminal)));
+            self.I = setdiff(self.S, self.B);
         end
 
         %
@@ -197,6 +215,14 @@ classdef MDP_dag < MDP
             text(1, self.gui_state.s, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
         end
 
+        function plot_DAG(self, path)
+            adj = sum(self.P, 3) > 0;
+            G = digraph(adj', self.S_names);
+            h = plot(G);
+            highlight(h, self.S_names(path), 'NodeColor', 'green', 'EdgeColor', 'green', 'LineWidth', 2);
+            highlight(h, self.S_names(self.B), 'NodeColor', 'red');
+        end
+
         function plot_gui(self)
             figure(self.gui_map);
 
@@ -205,33 +231,33 @@ classdef MDP_dag < MDP
                 score = ['FINISHED!: ', score];
             end
 
-            subplot(2, 8, 1);
+            subplot(2, 16, 1);
             self.plot_helper(self.R, 'R', score, self.gui_state.method);
 
-            subplot(2, 8, 2);
+            subplot(2, 16, 2);
             v = zeros(numel(self.S), 1);
             for s = self.gui_state.path
                 v(s) = v(s) + 1;
             end
             self.plot_helper(v, 'visited', '', '');
 
-            subplot(2, 8, 3);
+            subplot(2, 16, 3);
             self.plot_helper(self.V, 'V(s)', '', '');
 
-            subplot(2, 8, 4);
+            subplot(2, 16, 4);
             self.plot_helper(self.E_V, 'E_V(s)', '', '');
 
-            subplot(2, 8, 5);
+            subplot(2, 16, 5);
             self.plot_helper(sum(self.E_Q, 2), 'sum E_Q(s,.)', '', '');
 
             % plot map and current action-value f'n max Q(s, a)
             %
-            subplot(2, 8, 6);
+            subplot(2, 16, 6);
             self.plot_helper(max(self.Q, [], 2), 'max Q(s,.)', '', '');
 
             % plot map and transition probability across all possible actions, P(.|s)
             %
-            subplot(2, 8, 7);
+            subplot(2, 16, 7);
             pi = self.gui_state.pi';
             p = squeeze(self.P(:, self.gui_state.s, :));
             p = p * pi;
@@ -239,9 +265,14 @@ classdef MDP_dag < MDP
 
             % plot map and current transition probability given the selected action, P(.|s,a)
             %
-            subplot(2, 8, 8);
+            subplot(2, 16, 8);
             p = self.P(:, self.gui_state.s, self.gui_state.a);
             self.plot_helper(p, 'P(s''|s,a)', '', '');
+
+            % plot graph
+            %
+            subplot(2, 2, 2);
+            self.plot_DAG(self.gui_state.path);
 
             % plot reward / PE history
             %
@@ -257,12 +288,6 @@ classdef MDP_dag < MDP
             xticklabels(self.S_names(path));
             legend('rewards', 'PEs');
 
-        end
-
-        function plot(self)
-            adj = sum(self.P, 3) > 0;
-            G = digraph(adj', self.S_names);
-            plot(G);
         end
 
         function s = get_state_by_name(self, name)

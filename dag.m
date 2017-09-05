@@ -16,13 +16,19 @@ rewards('0') = 0;
 
 %%
 %
+close all;
+
 M = MDP_dag(keys(next), values(next), rewards);
 %M.sampleAC_gui('A');
 
+%{
 for i = 1:20
     [Rtot, path] = M.sampleAC(S.mdp.get_state_by_name('A'));
     disp(Rtot);
 end
+%}
+%M.add_terminal({'B', 'C'});
+%M.remove_terminal({'B'});
 M.sampleAC_gui('A');
 
 %%
@@ -31,7 +37,8 @@ S = SMDP();
 S.init_from_dag(keys(next), values(next), rewards, []);
 
 for i = 1:20
-    S.sampleAC(S.mdp.get_state_by_name('A'));
+    [Rtot, path] = S.sampleAC(S.mdp.get_state_by_name('A'));
+    disp(Rtot)
 end
 
 %S.sampleAC_gui(S.mdp.get_state_by_name('A'));

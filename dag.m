@@ -23,5 +23,9 @@ M.sampleAC_gui('A');
 %%
 %
 S = SMDP();
-S.init_from_dag(keys(next), values(next), rewards, {'D'});
-S.sampleAC_gui(S.get_state_by_name('A'));
+S.init_from_dag(keys(next), values(next), rewards, {'D', 'C'});
+
+figure;
+S.mdp.plot();
+
+S.sampleAC_gui(S.mdp.get_state_by_name('A'));

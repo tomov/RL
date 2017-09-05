@@ -35,6 +35,13 @@ classdef SMDP < handle
         %
         map = [];
 
+        % DAG
+        %
+        next_keys = []; % for convenience
+        next_values = [];
+        DAG = []; % actual DAG
+        DAG_trans = []; % transitive closure of the DAG to check for connectivity
+
         is_maze = false;
         is_dag = false;
     end
@@ -114,21 +121,7 @@ classdef SMDP < handle
                 mdp.P(s, s, a) = 0; % ...except from its goal state -- can't take the option there (makes no sense)
             end
 
-            % Normalize transition probabilities and mark some actions as illegal
-            %
-            for s = mdp.S
-                for a = mdp.A
-                    %if sum(P(:, s, a)) == 0
-                    %    P(s, s, a) = 1; % impossible moves keep you stationary
-                    %end
-                    if sum(mdp.P(:, s, a)) > 0 % allowed action
-                        assert(abs(sum(mdp.P(:, s, a)) - 1) < 1e-8);
-                    else % disallowed action
-                        mdp.H(s, a) = -Inf;
-                        mdp.Q(s, a) = -Inf;
-                    end
-                end
-            end
+            mdp.normalize_P();
 
             mdp.R(mdp.I) = SMDP.R_I; % penalty for staying still
 
@@ -142,90 +135,81 @@ classdef SMDP < handle
         function init_from_dag(self, next_keys, next_values, rewards, subtask_states)
             self.is_dag = true;
             self.is_maze = false;
+            self.next_keys = next_keys;
+            self.next_values = next_values;
 
-            %
             % Create MDP that we'll later augment with options
             %
-
             mdp = MDP_dag(next_keys, next_values, rewards);
+            self.mdp = mdp;
 
+            % get DAG
             %
+            adj = sum(self.mdp.P, 3) > 0;
+            self.DAG = digraph(adj', self.mdp.S_names);
+            self.DAG_trans = transclosure(self.DAG);
+
             % Set up options and their policies based on subtask states
             %
+            self.O = [];
+            for subtask_state = subtask_states
+                self.add_option(subtask_state);
+            end
+        end
 
-			subtasks = find(ismember(mdp.S_names, subtask_states));
+        % add an option to an already existing SMDP
+        %
+        function add_option(self, subtask_state)
+            assert(self.is_dag);
 
-            O = 1:numel(subtasks); 
-            self.pi = cell(numel(O), 1); % set of policies for each option
+            s = self.mdp.get_state_by_name(subtask_state);
 
             % For each subtask, find the optimal policy that gets you
             % from anywhere to its goal state. 
             %
-			for s = subtasks
-                % Set rewards of -1 for all internal states
-                % and reward of 1 at the subtask state
-                %
-                pseudorewards = rewards;
-                for key = keys(pseudorewards)
-                    key = key{1};
-                    if strcmp(key, mdp.S_names{s})
-                        pseudorewards(key) = SMDP.R_pseudoreward;
-                    else
-                        pseudorewards(key) = SMDP.R_I;
-                    end
-                end
+            prs = SMDP.R_I * ones(numel(self.mdp.S), 1);
+            prs(s) = SMDP.R_pseudoreward;
+            pseudorewards = containers.Map(self.mdp.S_names, prs);
 
-                smdp = MDP_dag(next_keys, next_values, pseudorewards);
-                save('shit.mat');
-                if ~self.is_hsm
-                    smdp.solveGPI(); % in regular Options framework, we assume the policies of the subtasks are given
-                end
-                
-                o = find(subtasks == s);
-                self.pi{o} = smdp.pi; % policy for option o corresponding to subtask with goal state s
-                self.smdp{o} = smdp;
-			end
+            smdp = MDP_dag(self.next_keys, self.next_values, pseudorewards);
+            assert(~ismember(s, smdp.B));
+            smdp.B = [smdp.B, s]; % add s to terminal states
+            smdp.I = setdiff(smdp.S, smdp.B);
+            if ~self.is_hsm
+                smdp.solveGPI(); % in regular Options framework, we assume the policies of the subtasks are given
+            end
+
+            o = numel(self.O) + 1;
+            self.pi{o} = smdp.pi; % policy for option o corresponding to subtask with goal state s
+            self.smdp{o} = smdp;
 
             %
-            % Augment the main MDP with options
+            % Augment the main MDP with the option
             %
 
-            O = numel(mdp.A) + 1 : numel(mdp.A) + numel(subtasks); % set of options = set of subtasks = set of subtask goal states; immediately follow the regular actions in indexing
-            mdp.A = [mdp.A, O]; % augment actions with options
+            a = numel(self.mdp.A) + 1;
+            self.O = [self.O, a];
+            self.mdp.A = [self.mdp.A, a]; % augment MDP actions with new option
 
             % Augment transitions P(s'|s,a)
             %
-            N = numel(mdp.S);
-            mdp.Q = zeros(N, numel(mdp.A));
-            mdp.E_Q = zeros(N, numel(mdp.A));
-            mdp.H = zeros(N, numel(mdp.A));
-            for a = O % for each action that is an option
-                o = find(O == a);
-                s = subtasks(o);
-                mdp.P(s, :, a) = 1; % from wherever we take the option, we end up at its goal state (b/c its policy is deterministic)
-                mdp.P(s, s, a) = 0; % ...except from its goal state -- can't take the option there (makes no sense)
-            end
+            N = numel(self.mdp.S);
+            self.mdp.Q = [self.mdp.Q, zeros(N,1)];
+            self.mdp.E_Q = [self.mdp.E_Q, zeros(N,1)];
+            self.mdp.H = [self.mdp.H, zeros(N,1)];
 
-            % Normalize transition probabilities and mark some actions as illegal
+            % find states that can get to 
             %
-            for s = mdp.S
-                for a = mdp.A
-                    %if sum(P(:, s, a)) == 0
-                    %    P(s, s, a) = 1; % impossible moves keep you stationary
-                    %end
-                    if sum(mdp.P(:, s, a)) > 0 % allowed action
-                        assert(abs(sum(mdp.P(:, s, a)) - 1) < 1e-8);
-                    else % disallowed action
-                        mdp.H(s, a) = -Inf;
-                        mdp.Q(s, a) = -Inf;
-                    end
+            for old_s = 1:numel(self.mdp.S)
+                if findedge(self.DAG_trans, self.mdp.S_names{old_s}, self.mdp.S_names{s});
+                    self.mdp.P(s, old_s, a) = 1;
+                    fprintf('     %d (%s) --> %d (%s)\n', old_s, self.mdp.S_names{old_s}, s, self.mdp.S_names{s});
+                else
+                    self.mdp.P(s, old_s, a) = 0;
                 end
             end
-
-            mdp.R(mdp.I) = SMDP.R_I; % penalty for staying still
-
-            self.O = O;
-            self.mdp = mdp;
+            self.mdp.P(s, s, a) = 0; % policy not available in goal state
+            self.mdp.normalize_P();
         end
 
         %
@@ -421,13 +405,23 @@ classdef SMDP < handle
                     [~, option_path] = self.smdp{o}.sampleGPI(s);
                 end
 
-                option_path = option_path(2:end-1); % don't count s (starting) and fake B (terminal) state
+                if self.is_maze
+                    option_path = option_path(2:end-1); % don't count s (starting) and fake B (terminal) state
+                else
+                    assert(self.is_dag);
+                    option_path = option_path(2:end); % don't count s (starting) state
+                end
                 k = numel(option_path);
                 assert(k > 0); % b/c can't take an option from its goal state
                 state.path = [state.path, option_path(1:end-1)];
 
                 rs = self.mdp.R(option_path) .* MDP.gamma .^ (0:k-1)'; % from Sec 3.2 of Sutton (1999)
-                fprintf('       option! %d -> path = %s, rs = %s\n', o, sprintf('%d ', option_path), sprintf('%.2f ', rs));
+                if self.is_maze
+                    fprintf('       option! %d -> path = %s, rs = %s\n', o, sprintf('%d ', option_path), sprintf('%.2f ', rs));
+                else
+                    assert(self.is_dag);
+                    fprintf('       option! %d -> path = %s, rs = %s\n', o, sprintf('%s ', self.mdp.S_names{option_path}), sprintf('%.2f ', rs));
+                end
                 r = sum(rs);
                 pe = r + (MDP.gamma ^ k) * self.mdp.V(new_s) - self.mdp.V(s);
 
@@ -570,9 +564,5 @@ classdef SMDP < handle
         % More helper f'ns
         %
 
-        function s = get_state_by_name(self, name)
-            assert(self.is_dag);
-            s = find(strcmp(name, self.mdp.S_names));
-        end
     end
 end

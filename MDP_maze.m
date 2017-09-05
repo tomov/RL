@@ -138,19 +138,6 @@ classdef MDP_maze < MDP
                         end   
                     end
 
-                    % Normalize transition probabilities and mark some actions as illegal
-                    %
-                    for a = A
-                        %if sum(P(:, s, a)) == 0
-                        %    P(s, s, a) = 1; % impossible moves keep you stationary
-                        %end
-                        if sum(P(:, s, a)) > 0 % allowed action
-                            P(:, s, a) = P(:, s, a) / sum(P(:, s, a)); % normalize P(.|s,a)
-                        else % disallowed action
-                            H(s, a) = -Inf;
-                            Q(s, a) = -Inf;
-                        end
-                    end
                 end
             end
             
@@ -163,6 +150,8 @@ classdef MDP_maze < MDP
             self.H = H;
             self.E_V = E_V;
             self.E_Q = E_Q;
+
+            self.normalize_P();
         end
 
         %

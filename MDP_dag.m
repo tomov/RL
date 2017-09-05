@@ -259,5 +259,15 @@ classdef MDP_dag < MDP
 
         end
 
+        function plot(self)
+            adj = sum(self.P, 3) > 0;
+            G = digraph(adj', self.S_names);
+            plot(G);
+        end
+
+        function s = get_state_by_name(self, name)
+            s = find(strcmp(name, self.S_names));
+        end
+
     end
 end

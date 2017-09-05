@@ -140,10 +140,10 @@ classdef MDP < handle
             else
                 % Internal state
                 %
-                state.s = new_s;
                 state.a = new_a;
                 state.pi = pi;
             end
+            state.s = new_s;
             state.rs = [state.rs, r];
             state.pes = [state.pes, 0]; % no PEs; we're not learning any more
         end
@@ -395,6 +395,26 @@ classdef MDP < handle
             [Q, Lambda] = eig(L);
             pvfs = Q;
         end
+
+        function normalize_P(self)
+            % Normalize transition probabilities and mark some actions as illegal
+            %
+            for s = self.S
+                for a = self.A
+                    %if sum(P(:, s, a)) == 0
+                    %    P(s, s, a) = 1; % impossible moves keep you stationary
+                    %end
+                    if sum(self.P(:, s, a)) > 0 % allowed action
+                        %assert(abs(sum(self.P(:, s, a)) - 1) < 1e-8);
+                        self.P(:, s, a) = self.P(:, s, a) / sum(self.P(:, s, a)); % normalize P(.|s,a)
+                    else % disallowed action
+                        self.H(s, a) = -Inf;
+                        self.Q(s, a) = -Inf;
+                    end
+                end
+            end
+        end
+
 
         %
         % Boilderplate for sampling paths using the GUI

@@ -106,8 +106,8 @@ classdef MDP < handle
         function state = init_sampleGPI(self, s)
             assert(numel(find(self.I == s)) == 1);
 
-            state.Rtot = 0;
-            state.path = [];
+            state.Rtot = self.R(s);
+            state.path = [s];
             state.rs = [];
             state.pes = [];
             state.s = s;
@@ -122,9 +122,6 @@ classdef MDP < handle
             s = state.s;
             a = state.a;
 
-            state.Rtot = state.Rtot + self.R(s);
-            state.path = [state.path, s];
-
             new_s = samplePF(self.P(:, s, a));
             new_a = self.pi(new_s);
             r = self.R(new_s);
@@ -134,8 +131,6 @@ classdef MDP < handle
             if ismember(new_s, self.B)
                 % Boundary state
                 %
-                state.Rtot = state.Rtot + self.R(new_s);
-                state.path = [state.path, new_s];
                 state.done = true;
             else
                 % Internal state
@@ -143,7 +138,10 @@ classdef MDP < handle
                 state.a = new_a;
                 state.pi = pi;
             end
+
             state.s = new_s;
+            state.Rtot = state.Rtot + self.R(new_s);
+            state.path = [state.path, new_s];
             state.rs = [state.rs, r];
             state.pes = [state.pes, 0]; % no PEs; we're not learning any more
         end
@@ -280,8 +278,8 @@ classdef MDP < handle
         function state = init_sampleAC(self, s)
             assert(numel(find(self.I == s)) == 1);
 
-            state.Rtot = 0;
-            state.path = [];
+            state.Rtot = self.R(s);
+            state.path = [s];
             state.rs = [];
             state.pes = [];
             state.s = s;
@@ -300,9 +298,6 @@ classdef MDP < handle
         function state = stepAC(self, state)
             s = state.s;
             a = state.a;
-
-            state.Rtot = state.Rtot + self.R(s);
-            state.path = [state.path, s];
 
             new_s = samplePF(self.P(:,s,a));
             if ~ismember(new_s, self.B)
@@ -330,8 +325,6 @@ classdef MDP < handle
             if ismember(new_s, self.B)
                 % Boundary state
                 %
-                state.Rtot = state.Rtot + self.R(new_s);
-                state.path = [state.path, new_s];
                 state.done = true;
             else
                 % Internal state
@@ -343,6 +336,8 @@ classdef MDP < handle
             end
 
             state.s = new_s;
+            state.Rtot = state.Rtot + self.R(new_s);
+            state.path = [state.path, new_s];
             state.rs = [state.rs, r];
             state.pes = [state.pes, pe];
         end

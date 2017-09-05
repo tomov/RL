@@ -17,15 +17,21 @@ rewards('0') = 0;
 %%
 %
 M = MDP_dag(keys(next), values(next), rewards);
-M.sampleAC_gui('A');
+%M.sampleAC_gui('A');
 
+for i = 1:20
+    [Rtot, path] = M.sampleAC(S.mdp.get_state_by_name('A'));
+    disp(Rtot);
+end
+M.sampleAC_gui('A');
 
 %%
 %
 S = SMDP();
-S.init_from_dag(keys(next), values(next), rewards, {'D', 'C'});
+S.init_from_dag(keys(next), values(next), rewards, []);
 
-figure;
-S.mdp.plot();
+for i = 1:20
+    S.sampleAC(S.mdp.get_state_by_name('A'));
+end
 
-S.sampleAC_gui(S.mdp.get_state_by_name('A'));
+%S.sampleAC_gui(S.mdp.get_state_by_name('A'));

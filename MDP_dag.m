@@ -3,6 +3,7 @@
 classdef MDP_dag < MDP
 
     properties (Constant = true)
+        R_I = 0; % default internal reward
     end
 
     properties (Access = public)
@@ -12,6 +13,7 @@ classdef MDP_dag < MDP
         %
         gui_state = []; % state for the GUI step-through
         gui_map = []; % figure for the GUI
+        gui_dag = []; % figure for GUI
         gui_timer = []; % timer for the GUI
     end
    
@@ -74,8 +76,7 @@ classdef MDP_dag < MDP
 
             % set up reward structure
             %
-            R = nan(N_S, 1); % instantaneous reward f'n R(s)
-            assert(numel(keys(rewards)) == N_S);
+            R = MDP_dag.R_I * ones(N_S, 1); % instantaneous reward f'n R(s)
             for key = keys(rewards)
                 key = key{1};
                 s = find(strcmp(key, S_names));
@@ -144,6 +145,7 @@ classdef MDP_dag < MDP
             self.gui_state = init_fn(s);
 
 			self.gui_map = figure;
+            self.gui_dag = figure;
             self.plot_gui();
 
             step_callback = @(hObject, eventdata) self.step_gui_callback(step_fn, hObject, eventdata);
@@ -153,9 +155,9 @@ classdef MDP_dag < MDP
             sample_callback = @(hObject, eventdata) self.sample_gui_callback(step_fn, hObject, eventdata);
 
             self.gui_timer = timer('Period', 0.5, 'TimerFcn', step_callback, 'ExecutionMode', 'fixedRate', 'TasksToExecute', 1000000);
-			uicontrol('Style', 'pushbutton', 'String', 'Start', ...
-			  		 'Position', [10 50 + 90 40 20], ...
-			  		 'Callback', start_callback);
+			%uicontrol('Style', 'pushbutton', 'String', 'Start', ...
+			%  		 'Position', [10 50 + 90 40 20], ...
+			%  		 'Callback', start_callback);
 			uicontrol('Style', 'pushbutton', 'String', 'Stop', ...
 					 'Position', [10 50 + 70 40 20], ...
 					 'Callback', stop_callback);
@@ -216,10 +218,39 @@ classdef MDP_dag < MDP
         end
 
         function plot_DAG(self, path)
+            if ~exist('path', 'var')
+                path = [];
+            end
             adj = sum(self.P, 3) > 0;
             G = digraph(adj', self.S_names);
             h = plot(G);
-            highlight(h, self.S_names(path), 'NodeColor', 'green', 'EdgeColor', 'green', 'LineWidth', 2);
+
+            % edge probabilities
+            %
+            ss = {};
+            new_ss = {};
+            ps = [];
+            pss = {};
+            for s = self.S
+                pi = self.softmax(s)';
+                p = squeeze(self.P(:, s, :));
+                p = p * pi;
+                for new_s = self.S
+                    if p(new_s) > 0
+                        ss = [ss; self.S_names(s)];
+                        new_ss = [new_ss; self.S_names(new_s)];
+                        ps = [ps; p(new_s)];
+                        pss = [pss; {num2str(p(new_s))}];
+                        highlight(h, self.S_names{s}, self.S_names{new_s}, 'LineWidth', 6 * p(new_s)); 
+                        %labeledge(h, self.S_names{s}, self.S_names{new_s}, num2str(p(new_s)));
+                    end
+                end
+            end
+            labeledge(h, ss, new_ss, pss);
+
+            % current path
+            highlight(h, self.S_names(path), 'NodeColor', 'green', 'EdgeColor', 'green');
+            % boundary states
             highlight(h, self.S_names(self.B), 'NodeColor', 'red');
         end
 
@@ -231,33 +262,33 @@ classdef MDP_dag < MDP
                 score = ['FINISHED!: ', score];
             end
 
-            subplot(2, 16, 1);
+            subplot(2, 8, 1);
             self.plot_helper(self.R, 'R', score, self.gui_state.method);
 
-            subplot(2, 16, 2);
+            subplot(2, 8, 2);
             v = zeros(numel(self.S), 1);
             for s = self.gui_state.path
                 v(s) = v(s) + 1;
             end
             self.plot_helper(v, 'visited', '', '');
 
-            subplot(2, 16, 3);
+            subplot(2, 8, 3);
             self.plot_helper(self.V, 'V(s)', '', '');
 
-            subplot(2, 16, 4);
+            subplot(2, 8, 4);
             self.plot_helper(self.E_V, 'E_V(s)', '', '');
 
-            subplot(2, 16, 5);
+            subplot(2, 8, 5);
             self.plot_helper(sum(self.E_Q, 2), 'sum E_Q(s,.)', '', '');
 
             % plot map and current action-value f'n max Q(s, a)
             %
-            subplot(2, 16, 6);
+            subplot(2, 8, 6);
             self.plot_helper(max(self.Q, [], 2), 'max Q(s,.)', '', '');
 
             % plot map and transition probability across all possible actions, P(.|s)
             %
-            subplot(2, 16, 7);
+            subplot(2, 8, 7);
             pi = self.gui_state.pi';
             p = squeeze(self.P(:, self.gui_state.s, :));
             p = p * pi;
@@ -265,15 +296,12 @@ classdef MDP_dag < MDP
 
             % plot map and current transition probability given the selected action, P(.|s,a)
             %
-            subplot(2, 16, 8);
+            subplot(2, 8, 8);
             p = self.P(:, self.gui_state.s, self.gui_state.a);
             self.plot_helper(p, 'P(s''|s,a)', '', '');
 
             % plot graph
             %
-            subplot(2, 2, 2);
-            self.plot_DAG(self.gui_state.path);
-
             % plot reward / PE history
             %
             rs = [0 self.gui_state.rs];
@@ -288,6 +316,15 @@ classdef MDP_dag < MDP
             xticklabels(self.S_names(path));
             legend('rewards', 'PEs');
 
+            % plot the DAG
+            %
+            figure(self.gui_dag);
+
+            self.plot_DAG(self.gui_state.path);
+
+            % return to main plot
+            %
+            figure(self.gui_map);
         end
 
         function s = get_state_by_name(self, name)

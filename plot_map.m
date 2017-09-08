@@ -1,5 +1,5 @@
 function plot_map(map, color)
-    reward_symbol = '$';
+    reward_symbols = '0123456789$';
     empty_symbol = '.';
     wall_symbol = '#';
     agent_symbol = 'X';
@@ -38,8 +38,13 @@ function plot_map(map, color)
     text(ay - gap_size, ax, 'X', 'FontSize', font_size, 'FontWeight', 'bold', 'Color', 'black');
 
     % rewards 
-    %[rx, ry] = ind2sub(size(map), find(map == reward_symbol));
-    %text(ry - gap_size, rx, '$', 'FontSize', font_size, 'FontWeight', 'bold', 'Color', 'green');
+    [rxs, rys] = ind2sub(size(map), find(ismember(map, reward_symbols)));
+    for i = 1:numel(rxs)
+        rx = rxs(i);
+        ry = rys(i);
+        money = ['$', map(rx, ry)];
+        text(ry - gap_size, rx, money, 'FontSize', font_size * 0.5, 'FontWeight', 'bold', 'Color', 'green');
+    end
 
 
     % path

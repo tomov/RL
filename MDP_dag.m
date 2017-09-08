@@ -217,7 +217,7 @@ classdef MDP_dag < MDP
             text(1, self.gui_state.s, 'X', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'red');
         end
 
-        function plot_DAG(self, path)
+        function h = plot_DAG(self, path)
             if ~exist('path', 'var')
                 path = [];
             end
@@ -241,12 +241,12 @@ classdef MDP_dag < MDP
                         new_ss = [new_ss; self.S_names(new_s)];
                         ps = [ps; p(new_s)];
                         pss = [pss; {num2str(p(new_s))}];
-                        highlight(h, self.S_names{s}, self.S_names{new_s}, 'LineWidth', 6 * p(new_s)); 
+                        highlight(h, self.S_names{s}, self.S_names{new_s}, 'LineWidth', 3 * p(new_s)); 
                         %labeledge(h, self.S_names{s}, self.S_names{new_s}, num2str(p(new_s)));
                     end
                 end
             end
-            labeledge(h, ss, new_ss, pss);
+            %labeledge(h, ss, new_ss, pss);
 
             % current path
             highlight(h, self.S_names(path), 'NodeColor', 'green', 'EdgeColor', 'green');

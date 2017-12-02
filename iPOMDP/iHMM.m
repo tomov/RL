@@ -53,7 +53,7 @@ for t = 2:N
 end
 
 
-% show transition matrix
+%% show transition matrix
 %
 figure;
 
@@ -70,25 +70,38 @@ ylabel('s_{t-1}');
 title('T(s_t|s_{t-1})');
 
 
-% plot the observations
+%% plot the observations
 %
+figure;
 C = colormap;
 C = C(randperm(size(C,1)),:); % use different color for each cluster
 
-
-for j = 1:5
-    subplot(1,5,j);
-    hold on;
-    for k = 1:max(z(:,j)) % for each cluster
-        if sum(z(:,j) == k) == 0, continue; end % NOTE: not all clusters are used!!! unlike the CRP construct
-        c = C(mod(k,64),:);
-        scatter(x(z(:,j) == k, j, 1), x(z(:,j) == k, j, 2), 4, c); % plot all the observations
-        circle(phi(k,1), phi(k,2), 2, c); % and a circle around the center (mean of observations)
-    end
-    hold off;
-    
-    xlabel(['group ', num2str(j)]);
-    
-    axis([0 20 0 20]);
+hold on;
+for k = 1:max(s) % for each state
+    if sum(s == k) == 0, continue; end % NOTE: not all states are used!!! unlike the CRP construct
+    c = C(mod(k,64),:);
+    scatter(o(s == k, 1), o(s == k, 2), 4, c); % plot all the observations for that state
+    circle(phi(k,1), phi(k,2), 2, c); % and a circle around the center of the state (mean of observations)
 end
+hold off;
 
+
+%% plot observations sequentially
+%
+figure;
+C = colormap;
+C = C(randperm(size(C,1)),:); % use different color for each cluster
+
+hold on;
+for t = 1:N % for each time point
+    k = s(t);
+    c = C(mod(k,64),:);
+    scatter(o(t, 1), o(t, 2), 4, c); % plot all the observations for that state
+    if t > 1
+        plot([o(t-1, 1) o(t, 1)], [o(t-1, 2) o(t, 2)], 'Color', c);
+    end
+    circle(phi(k,1), phi(k,2), 2, c); % and a circle around the center of the state (mean of observations)
+    
+    pause;
+end
+hold off;

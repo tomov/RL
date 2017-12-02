@@ -23,10 +23,6 @@ theta_star = nan(K,2); % parameters for each cluster
 theta = nan(N,2); % parameters for each observation = theta_star{z(i)}
 x = nan(N,2); % observations
 
-% draw cluster mixing proportions 
-% pi ~ GEM(alpha)
-%
-pi = GEM(alpha, K);
 
 % draw cluster params from base distribution
 % theta*_k ~ H
@@ -34,6 +30,11 @@ pi = GEM(alpha, K);
 for k = 1:K
     theta_star(k,:) = H();
 end
+
+% draw cluster mixing proportions 
+% pi ~ GEM(alpha)
+%
+pi = GEM(alpha, K);
 
 % draw cluster assignments and observations
 % z_i ~ pi

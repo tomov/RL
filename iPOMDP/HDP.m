@@ -21,18 +21,18 @@ theta = nan(N,J,2); % parameters for each observation (row) for each group (colu
 x = nan(N,J,2); % observation (row) for each group (column)
 
 
+% draw cluster params from base distribution
+% phi_k ~ H
+%
+for k = 1:K % for each (shared) cluster k
+    phi(k,:) = H();
+end
+
 % draw shared cluster mixing proportions 
 % beta ~ GEM(gamma)
 %
 beta = GEM(gamma, K);
     
-% draw cluster params from base distribution
-% phi_k ~ H
-%
-for k = 1:K
-    phi(k,:) = H();
-end
-
 % for each group,
 % draw mixing proportions, then the cluster assignments and the observations
 % pi_j ~ DP(alpha_0, beta) 

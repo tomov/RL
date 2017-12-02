@@ -1,24 +1,30 @@
-% Infinite hidden Markov model (iHMM) based on HDP using stick-breaking construction (GEM)
+% Hierarchical iHMM.
 % Following nomenclature of Teh 2006
-% see HDP.m for comparison
+% see iHMM.m for comparison
 %
+clear all; close all;
 
 H = @() rand(1,2) * 20; % base distribution = prior distribution over observation distribution parameters. Here, 2D uniform random variable in the square between [0, 0] and [10, 10] 
 O = @(theta) mvnrnd(theta, [1 0; 0 1]); % observation distribution, parametrized by theta. Here, 2D Gaussain with fixed covariance and parametrized mean. So we have a 2D Gaussian mixture
 
-gamma = 10; % concentration parameter for state popularities (mean transition distribution)
-alpha_0 = 30; % concentration parameter for the individual transition distributions (for each previous state)
+gamma = 100; % concentration parameter for state "communities" (clusters of states)
+alpha_0 = 10; % concentration parameter for state popularities (mean transition distribution)
+alpha_1 = 1; % concentration parameter for mean transition distributions (one for each community of states)
+alpha_2 = 10; % concentration parameter for the individual transition distributions (for each previous state)
 
+C = 10; % # of "communities" = clusters of states
 N = 100; % # observations = # of time points
 J = 50; % # of groups = # of states
 K = 50; % # of shared active clusters (across groups) = # of states
 
-assert(J == K); % groups = clusters = states in iHMM
+assert(J == K); % groups = clusters = states in hiHMM
 
+T_means = nan(C,K); % average transition probabilities for each community of states
+z = nan(J,1); % community assignment for each state
 T = nan(J,K); % transition probabilities: T(j,i) = T(s_t = i | s_t-1 = j) 
 phi = nan(K,2); % parameters for observation distribution for each state: o ~ O(.|s) = O(phi_s)
 
-
+    
 % draw observation distribution params from base distribution; one for each state k
 % phi_k ~ H
 %
@@ -26,16 +32,30 @@ for k = 1:K % for each state k
     phi(k,:) = H();
 end
 
-% draw popularity = average transition probability to each state
-% T_mean ~ GEM(gamma)
+% draw state cluster mixing proportions
+% beta ~ GEM(gamma)
 %
-T_mean = GEM(gamma, K);
-    
-% for each state j, draw transition probabilities
-% T_j ~ DP(alpha_0, T_mean) 
+beta = GEM(gamma, C);
+
+% draw popularity = average transition probability to each state
+% T_mean ~ GEM(alpha_0)
+%
+T_mean = GEM(alpha_0, K);
+
+% draw average transition probability to each state; one for each *cluster* of states c
+% T_means_c ~ DP(alpha_1, T_mean)
+%
+for c = 1:C % for each cluster of states c
+    T_means(c,:) = DP(alpha_1, T_mean);
+end
+
+% for each state j, draw its community and transition probabilities; see DP_mix.m 
+% z_j ~ beta
+% T_j ~ DP(alpha_2, T_means_z_j) 
 %
 for j = 1:J % for each previous state j
-    T(j,:) = DP(alpha_0, T_mean);
+    z(j) = find(mnrnd(1, beta)); 
+    T(j,:) = DP(alpha_2, T_means(z(j),:));
 end
 
 % draw first state based on popularity, as well as its observation
@@ -58,18 +78,34 @@ end
 %
 figure;
 
-subplot(2,1,1);
+subplot(3,2,1);
 plot(T_mean);
-ylabel('s_t');
-xlabel('mean T(s_t | s_{t-1})');
+xlabel('s_t');
+ylabel('mean T(s_t | s_{t-1})');
 title('"popularity" of state s_t');
 
-subplot(2,1,2);
+subplot(3,2,3);
+imagesc(T_means);
+xlabel('s_t');
+ylabel('community');
+title('"popularity" for each state within each community');
+
+subplot(3,2,4);
+plot(beta, 1:C);
+ylabel('community');
+xlabel('beta');
+title('"popularity" of each community');
+set(gca,'Ydir','reverse');
+
+
+subplot(3,2,5);
 imagesc(T);
 xlabel('s_t');
 ylabel('s_{t-1}');
 title('T(s_t|s_{t-1})');
 
+
+%{
 
 %% plot the observations
 %
@@ -106,3 +142,5 @@ for t = 1:N % for each time point
     pause;
 end
 hold off;
+
+%}

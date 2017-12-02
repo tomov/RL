@@ -2,6 +2,11 @@
 % yields probability of assigning each observation to a cluster
 % Following nomenclature of Teh 2010
 %
+% G ~ DP(alpha, H)
+% G = sum of pi_k * delta_theta_k, where delta_theta_k is a Kronecher delta f'n at theta_k
+% theta_i ~ G
+% theta_i = the parameters (hence cluster assignment) for observation x_i
+
 
 %rng default;
 
@@ -16,24 +21,22 @@ n = []; % # of observations assigned to each cluster
 z = nan(N,1); % cluster assignment for each observation
 theta_star = []; % parameters for each cluster
 theta = nan(N,2); % parameters for each observation = theta_star{z(i)}
-x = nan(N,2);
-
-beta = nan(K,1); % where we broke each stick
-pi = nan(K,1); % mixing proportion = probability of each cluster
+x = nan(N,2); % observations
 
 % draw cluster mixing proportions 
 % pi ~ GEM(alpha)
+%
+pi = GEM(alpha, K);
+
+% draw cluster params from base distribution
 % theta*_k ~ H
 %
-for k = 1:K % for each cluster k
-    beta(k) = betarnd(1, alpha); % draw stick-breaking portion from beta distribution
-    pi(k) = beta(k) * prod(1 - beta(1:k-1)); % mixing proportion of cluster k
-    theta_star(k,:) = H(); % draw cluster params from base distribution
+for k = 1:K
+    theta_star(k,:) = H();
 end
 
-pi = pi / sum(pi); % the sum of pi converges to 1 as K --> infinity, however here we are working with limited K
-
-% draw observations
+% draw cluster assignments and observations
+% z_i ~ pi
 % x_i ~ F(theta*_z_i)
 %
 for i = 1:N % for each observation i

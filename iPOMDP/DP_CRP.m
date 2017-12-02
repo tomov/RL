@@ -2,6 +2,10 @@
 % directly yields cluster assignments of each observation
 % Following nomenclature of Teh 2010
 %
+% G ~ DP(alpha, H)
+% G = sum of pi_k * delta_theta_k, where delta_theta_k is a Kronecher delta f'n at theta_k
+% theta_i ~ G
+% theta_i = the parameters (hence cluster assignment) for observation x_i
 
 %rng default;
 
@@ -15,8 +19,8 @@ K = 0; % # of active clusters
 n = []; % # of observations assigned to each cluster
 z = nan(N,1); % cluster assignment for each observation
 theta_star = []; % parameters for each cluster
-theta = nan(N,2); % parameters for each observation = theta_star{z(i)}
-x = nan(N,2);
+theta = nan(N,2); % parameters for each observation = theta_star(z(i))
+x = nan(N,2); % observations
 
 for i = 1:N % for each observation i
     % with probability proportional to n(k), assign i to cluster k;

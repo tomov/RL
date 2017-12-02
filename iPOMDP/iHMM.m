@@ -3,103 +3,74 @@
 % see HDP.m for comparison
 %
 
-H = @() rand(1,2) * 20; % base distribution = prior distribution over component parameters. Here, 2D uniform random variable in the square between [0, 0] and [10, 10] 
-F = @(theta) mvnrnd(theta, [1 0; 0 1]); % component distribution, parametrized by theta. Here, 2D Gaussain with fixed covariance and parametrized mean. So we have a 2D Gaussian mixture
+H = @() rand(1,2) * 20; % base distribution = prior distribution over observation distribution parameters. Here, 2D uniform random variable in the square between [0, 0] and [10, 10] 
+O = @(theta) mvnrnd(theta, [1 0; 0 1]); % observation distribution, parametrized by theta. Here, 2D Gaussain with fixed covariance and parametrized mean. So we have a 2D Gaussian mixture
 
 gamma = 10; % concentration parameter for shared clusters
-alpha_0 = 5; % concentration parameter for clusters in each group
-J = 50; % # of groups
-N = 50; % # observations
-K = 50; % # of shared active clusters (across groups). Note we must specify in advance b/c we're using the stick-breaking construction
+alpha_0 = 30; % concentration parameter for clusters in each group
 
-b = nan(K,1); % where we broke each stick
-phi = nan(K,2); % parameters for each shared cluster
-pi = nan(K,J); % mixing proportions = probability of each shared cluster (row) for each group (column)
-n = zeros(K,J); % # of observations assigned to each cluster (row) for each group (column)
-z = nan(N,J); % cluster assignment for each observation (row) for each group (column)
-theta = nan(N,J,2); % parameters for each observation (row) for each group (column) = phi(z(i))
-x = nan(N,J,2); % observation (row) for each group (column)
+N = 100; % # observations = # of time points
+J = 50; % # of groups = # of states
+K = 50; % # of shared active clusters (across groups) = # of states
 
+assert(J == K); % groups = clusters = states in iHMM
 
-% draw shared cluster mixing proportions 
-% beta ~ GEM(gamma)
+T = nan(J,K); % transition probabilities: T(j,i) = T(s_t = i | s_t-1 = j) 
+phi = nan(K,2); % parameters for observation distribution for each state: o ~ O(.|s) = O(phi_s)
+
+% draw popularity = average transition probability to each state
+% T_mean ~ GEM(gamma)
 %
-beta = GEM(gamma, K);
+T_mean = GEM(gamma, K);
     
-% draw cluster params from base distribution
+% draw observation distribut params from base distribution
 % phi_k ~ H
 %
 for k = 1:K
     phi(k,:) = H();
 end
 
-% for each group,
-% draw mixing proportions, then the cluster assignments and the observations
-% pi_j ~ DP(alpha_0, beta) 
-% z_ji ~ pi_j
-% x_ji ~ F(phi_z_ji)
-% note groups are i.i.d. given beta
+% for each state j, draw transition probabilities
+% T_j ~ DP(alpha_0, T_mean) 
 %
-for j = 1:J % for each group j
-    % use stick-breaking construct for each group
-    % remember that pi_j = sum of w_k delta_c_k
-    % where w_k = the mixing coefficients, and
-    % c_k = the "parameters" for "cluster" k
-    % however in this case, the base distribution is a categorical
-    % distribution beta
-    % so a draw c_k ~ beta is an integer 1..K, hence delta_c_k is a one-hot vector
-    % e.g. delta_c_k = [0 0 0 0 1 0 0 0 ...]
-    % corresponding to a shared cluster from the higher-level DP
-    % the rows are the one-hot vectors (so each row corresponds to a new
-    % "cluster atom" delta_c_k)
-    % note that the same "cluster atom" (i.e. shared cluster in the
-    % higher-level DP) can be picked more than once since beta is a discrete
-    % distribution, unlike the case when the base distribution H is
-    % continuous and all clusters have unique parameters with probability 1
-    %
-    w = GEM(alpha_0, K);
-    d = zeros(K,K);
-    for k = 1:K
-        d(k,:) = mnrnd(1, beta);
-    end
-    p = w' * d;
-    assert(abs(sum(p) - 1) < 1e-10); % should sum to 1
-    pi(:,j) = p';
+for j = 1:J % for each previous state j
+    T(j,:) = DP(alpha_0, T_mean);
+end
 
-    % draw the observations
-    %
-    for i = 1:N % for each observation
-        z(i,j) = find(mnrnd(1, pi(:,j))); % draw (shared) cluster assignment
+% draw first state based on popularity, as well as its observation
+% s_1 ~ T_mean
+% o_1 ~ F()
+%
+s(1) = find(mnrnd(1, T_mean));
+o(1,:) = O(phi(s(1),:));
 
-        theta(i,j,:) = phi(z(i,j),:); % copy over cluster parameters
-        x(i,j,:) = F(reshape(theta(i,j,:), 2, 1)); % draw observation from component distribution
-    end
+% draw the sequence of states and observations
+% s_t ~ T_s_t-1
+%
+for t = 2:N
+    s(t) = find(mnrnd(1, T(s(t-1),:)))
+    o(t,:) = O(phi(s(t),:));
 end
 
 
-% convert to HMM terminology
-% groups = previous states
-% (shared) clusters = next states
-% T(i,j) = T(s_t = i | s_t-1 = j)
+% show transition matrix
 %
-T = pi;
-
 figure;
-subplot(1,2,1);
-imagesc(T);
-xlabel('s_{t-1}');
-ylabel('s_t');
-title('T(s_t|s_{t-1})');
 
-subplot(1,2,2);
-plot(beta(end:-1:1), 1:K);
+subplot(2,1,1);
+plot(T_mean);
 ylabel('s_t');
 xlabel('mean T(s_t | s_{t-1})');
 title('"popularity" of state s_t');
 
-%{
+subplot(2,1,2);
+imagesc(T);
+xlabel('s_t');
+ylabel('s_{t-1}');
+title('T(s_t|s_{t-1})');
 
-% plot the clusters
+
+% plot the observations
 %
 C = colormap;
 C = C(randperm(size(C,1)),:); % use different color for each cluster
@@ -121,4 +92,3 @@ for j = 1:5
     axis([0 20 0 20]);
 end
 
-%}

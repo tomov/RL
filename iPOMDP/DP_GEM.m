@@ -56,7 +56,6 @@ end
 C = colormap;
 C = C(randperm(size(C,1)),:); % use different color for each cluster
 
-figure;
 hold on;
 for k = 1:max(z) % for each cluster
     if sum(z == k) == 0, continue; end % NOTE: not all clusters are used!!! unlike the CRP construct

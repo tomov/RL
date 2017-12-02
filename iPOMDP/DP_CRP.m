@@ -60,7 +60,6 @@ end
 C = colormap;
 C = C(randperm(size(C,1)),:); % use different color for each cluster
 
-figure;
 hold on;
 for k = 1:K % for each cluster
     scatter(x(z == k, 1), x(z == k, 2), 4, C(k,:)); % plot all the observations

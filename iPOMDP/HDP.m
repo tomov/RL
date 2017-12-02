@@ -33,8 +33,12 @@ for k = 1:K
     phi(k,:) = H();
 end
 
-% draw mixing proportion for each group
+% for each group,
+% draw mixing proportions, then the cluster assignments and the observations
 % pi_j ~ DP(alpha_0, beta) 
+% z_ji ~ pi_j
+% x_ji ~ F(phi_z_ji)
+% note groups are i.i.d. given beta
 %
 for j = 1:J % for each group j
     % use stick-breaking construct for each group
@@ -61,13 +65,9 @@ for j = 1:J % for each group j
     p = w' * d;
     assert(abs(sum(p) - 1) < 1e-10); % should sum to 1
     pi(:,j) = p';
-end
 
-% draw cluster assignments and observations for each group
-% z_ji ~ pi_j
-% x_ji ~ F(phi_z_ji)
-%
-for j = 1:J % for each group
+    % draw the observations
+    %
     for i = 1:N % for each observation
         z(i,j) = find(mnrnd(1, pi(:,j))); % draw (shared) cluster assignment
 
@@ -75,6 +75,7 @@ for j = 1:J % for each group
         x(i,j,:) = F(reshape(theta(i,j,:), 2, 1)); % draw observation from component distribution
     end
 end
+
 
 % plot the clusters
 %

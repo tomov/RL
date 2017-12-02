@@ -41,30 +41,7 @@ end
 % note groups are i.i.d. given beta
 %
 for j = 1:J % for each group j
-    % use stick-breaking construct for each group
-    % remember that pi_j = sum of w_k delta_c_k
-    % where w_k = the mixing coefficients, and
-    % c_k = the "parameters" for "cluster" k
-    % however in this case, the base distribution is a categorical
-    % distribution beta
-    % so a draw c_k ~ beta is an integer 1..K, hence delta_c_k is a one-hot vector
-    % e.g. delta_c_k = [0 0 0 0 1 0 0 0 ...]
-    % corresponding to a shared cluster from the higher-level DP
-    % the rows are the one-hot vectors (so each row corresponds to a new
-    % "cluster atom" delta_c_k)
-    % note that the same "cluster atom" (i.e. shared cluster in the
-    % higher-level DP) can be picked more than once since beta is a discrete
-    % distribution, unlike the case when the base distribution H is
-    % continuous and all clusters have unique parameters with probability 1
-    %
-    w = GEM(alpha_0, K);
-    d = zeros(K,K);
-    for k = 1:K
-        d(k,:) = mnrnd(1, beta);
-    end
-    p = w' * d;
-    assert(abs(sum(p) - 1) < 1e-10); % should sum to 1
-    pi(:,j) = p';
+    pi(:,j) = DP(alpha_0, beta);
 
     % draw the observations
     %

@@ -1,9 +1,9 @@
-%% Dirichlet process (DP) mixture model as Chinese restaurant process (CRP) mixture
+% Dirichlet process (DP) mixture model as Chinese restaurant process (CRP) mixture
 % directly yields cluster assignments of each observation
 % Following nomenclature of Teh 2010
 %
 
-rng default;
+%rng default;
 
 H = @() rand(1,2) * 20; % base distribution = prior distribution over component parameters. Here, 2D uniform random variable in the square between [0, 0] and [10, 10] 
 F = @(theta) mvnrnd(theta, [1 0; 0 1]); % component distribution, parametrized by theta. Here, 2D Gaussain with fixed covariance and parametrized mean. So we have a 2D Gaussian mixture
@@ -25,7 +25,7 @@ for i = 1:N % for each observation i
     p = [n(1:K), alpha];
     p = p / sum(p);
     
-    z(i) = find(mnrnd(1, p));
+    z(i) = find(mnrnd(1, p)); % sample cluster assignment from categorical distribution with probabilities = the # of observations in each cluster, and alpha for the new cluster
     
     if z(i) == K + 1
         % new cluster
@@ -47,7 +47,7 @@ for i = 1:N % for each observation i
     % with CRP construct
     %
     theta(i,:) = theta_star(z(i),:); % observation parameters = its cluster parameters
-    x(i,:) = F(theta(i,:)); % draw observation
+    x(i,:) = F(theta(i,:)); % draw observation from component distribution
 end
 
 
@@ -63,24 +63,3 @@ for k = 1:K % for each cluster
     circle(theta_star(k,1), theta_star(k,2), 2, C(k,:)); % and a circle around the center (mean of observations)
 end
 hold off;
-
-%% DP mixture as stick-breaking construction (GEM)
-% yields probability of assigning each observation to a cluster
-%
-
-
-%% Hierarchical Dirichlet process (HDP)
-%
-
-%% infinite HMM with HDP
-%
-
-%% hierarchical infinite HMM
-%
-
-function h = circle(x,y,r,c)
-    th = 0:pi/50:2*pi;
-    xunit = r * cos(th) + x;
-    yunit = r * sin(th) + y;
-    h = plot(xunit, yunit, 'Color', c);
-end

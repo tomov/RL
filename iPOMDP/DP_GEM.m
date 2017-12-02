@@ -19,7 +19,7 @@ K = 1000; % # of active clusters NOTE -- we must specify in advance here
 
 n = []; % # of observations assigned to each cluster
 z = nan(N,1); % cluster assignment for each observation
-theta_star = []; % parameters for each cluster
+theta_star = nan(K,2); % parameters for each cluster
 theta = nan(N,2); % parameters for each observation = theta_star{z(i)}
 x = nan(N,2); % observations
 
@@ -39,17 +39,7 @@ end
 % z_i ~ pi
 % x_i ~ F(theta*_z_i)
 %
-for i = 1:N % for each observation i
-    z(i) = find(mnrnd(1, pi)); % sample cluster assignment from categorical distribution with probabilities = the mixing proportions
-    
-    % draw actual observation based on its cluster parameters
-    % this is where the "mixture" part comes in; up to now, it's just a DP
-    % with stick-breaking construct
-    %
-    theta(i,:) = theta_star(z(i),:); % observation parameters = its cluster parameters
-    x(i,:) = F(theta(i,:)); % draw observation
-end
-
+[x, z, theta] = DP_mix(pi, N, theta_star, F);
 
 % plot the clusters
 %

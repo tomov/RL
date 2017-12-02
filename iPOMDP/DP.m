@@ -1,14 +1,14 @@
-function G = DP_discrete(alpha, H)
+function G = DP(alpha, H)
 % Dirichlet process witha discrete base distribution H. Returns 
 % G ~ DP(alpha, H)
 % Used in HDP and iHMM
 %
 % INPUT:
 % alpha = concentration parameter
-% H = base distribution as a vector of probabilities
+% H = base distribution as a (1 x K) vector of probabilities
 %
 % OUTPUT:
-% G = vector of probabilities of the same size as H
+% G = (1 x K) vector of probabilities
 
 
 % use stick-breaking construct

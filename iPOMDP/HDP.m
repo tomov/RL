@@ -42,15 +42,7 @@ end
 %
 for j = 1:J % for each group j
     pi(:,j) = DP(alpha_0, beta);
-
-    % draw the observations
-    %
-    for i = 1:N % for each observation
-        z(i,j) = find(mnrnd(1, pi(:,j))); % draw (shared) cluster assignment
-
-        theta(i,j,:) = phi(z(i,j),:); % copy over cluster parameters
-        x(i,j,:) = F(reshape(theta(i,j,:), 2, 1)); % draw observation from component distribution
-    end
+    [x(:,j,:), z(:,j,:), theta(:,j,:)] = DP_mix(pi(:,j), N, phi, F);
 end
 
 

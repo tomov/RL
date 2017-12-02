@@ -29,7 +29,7 @@ function plot_map(map, color)
     axis off;
 
 
-    font_size = 40;
+    font_size = 20;
     gap_size = 0.25;
     line_width = 5;
 

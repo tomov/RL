@@ -1,15 +1,18 @@
-% Hierarchical iHMM.
+% Hierarchical iHMM, version 1 -- clusters of states that share the same
+% average transition vector.
 % Following nomenclature of Teh 2006
 % see iHMM.m for comparison
 %
 clear all; close all;
+
+rng(15);
 
 H = @() rand(1,2) * 20; % base distribution = prior distribution over observation distribution parameters. Here, 2D uniform random variable in the square between [0, 0] and [10, 10] 
 O = @(theta) mvnrnd(theta, [1 0; 0 1]); % observation distribution, parametrized by theta. Here, 2D Gaussain with fixed covariance and parametrized mean. So we have a 2D Gaussian mixture
 
 gamma = 100; % concentration parameter for state "communities" (clusters of states)
 alpha_0 = 10; % concentration parameter for state popularities (mean transition distribution)
-alpha_1 = 1; % concentration parameter for mean transition distributions (one for each community of states)
+alpha_1 = 3; % concentration parameter for mean transition distributions (one for each community of states)
 alpha_2 = 10; % concentration parameter for the individual transition distributions (for each previous state)
 
 C = 10; % # of "communities" = clusters of states
@@ -82,19 +85,19 @@ subplot(3,2,1);
 plot(T_mean);
 xlabel('s_t');
 ylabel('mean T(s_t | s_{t-1})');
-title('"popularity" of state s_t');
+title('$\bar{T}$ = popularity of each state', 'interpreter','Latex');
 
 subplot(3,2,3);
 imagesc(T_means);
 xlabel('s_t');
 ylabel('community');
-title('"popularity" for each state within each community');
+title('$\bar{T}_c$ = popularity for each state within each community $c$', 'interpreter','Latex');
 
 subplot(3,2,4);
 plot(beta, 1:C);
 ylabel('community');
 xlabel('beta');
-title('"popularity" of each community');
+title('$\beta$ = popularity of each community', 'interpreter','Latex');
 set(gca,'Ydir','reverse');
 
 
@@ -102,7 +105,7 @@ subplot(3,2,5);
 imagesc(T);
 xlabel('s_t');
 ylabel('s_{t-1}');
-title('T(s_t|s_{t-1})');
+title('$T_s$ = transition vector for each state $s$', 'interpreter','Latex');
 
 
 %{

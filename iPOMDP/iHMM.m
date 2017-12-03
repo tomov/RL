@@ -2,6 +2,9 @@
 % Following nomenclature of Teh 2006
 % see HDP.m for comparison
 %
+clear all; close all;
+
+rng(15);
 
 H = @() rand(1,2) * 20; % base distribution = prior distribution over observation distribution parameters. Here, 2D uniform random variable in the square between [0, 0] and [10, 10] 
 O = @(theta) mvnrnd(theta, [1 0; 0 1]); % observation distribution, parametrized by theta. Here, 2D Gaussain with fixed covariance and parametrized mean. So we have a 2D Gaussian mixture
@@ -60,9 +63,9 @@ figure;
 
 subplot(2,1,1);
 plot(T_mean);
-ylabel('s_t');
-xlabel('mean T(s_t | s_{t-1})');
-title('"popularity" of state s_t');
+xlabel('s_t');
+ylabel('\beta_{s_t}');
+title('\beta = "popularity" of state s_t = mean T(s_t | s_{t-1}) across s_{t-1}');
 
 subplot(2,1,2);
 imagesc(T);
@@ -86,7 +89,10 @@ for k = 1:max(s) % for each state
 end
 hold off;
 
+title('observations');
 
+
+%{
 %% plot observations sequentially
 %
 figure;
@@ -106,3 +112,5 @@ for t = 1:N % for each time point
     pause;
 end
 hold off;
+
+%}

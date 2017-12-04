@@ -1,0 +1,149 @@
+\documentclass[11pt]{article}
+\usepackage{geometry}                % See geometry.pdf to learn the layout options. There are lots.
+\geometry{letterpaper}                   % ... or a4paper or a5paper or ... 
+%\geometry{landscape}                % Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}    % Activate to begin paragraphs with an empty line rather than an indent
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{epstopdf}
+\usepackage{hyperref}
+\DeclareGraphicsRule{.tif}{png}{.png}{`convert #1 `dirname #1`/`basename #1 .tif`.png}
+
+\newtheorem{claim}{Claim}
+
+\title{Hierarchical iPOMDPs for MTRL}
+\author{Momchil}
+%\date{Nov 2, 2017}                                           % Activate to display a given date or no date
+
+\begin{document}
+\maketitle
+%\section{}
+%\subsection{}
+
+
+
+
+
+
+\section{Background} 
+
+Define MDPs, RL framework
+POMDPs
+Multi-task RL
+HRL = sMDPs
+Option discovery as hidden state inference
+POMDP formulation for one environment
+Multi-task POMDP
+
+\subsection{Reinforcement Learning and Markov Decision Processes}
+
+In reinforcement learning (RL), tasks are traditionally represented as Markov Decision Processes (MDPs) \cite{Sutton1998}. We define an MDP as a tuple $(\mathcal{S}, \mathcal{A}, T, R, I, \mathcal{F})$ where:
+\begin{itemize}
+\item $\mathcal{S}$ is a set of states that the agent can occupy,
+\item $\mathcal{A}$ is a set of actions that the agent can perform in those states,
+\item $T(\cdot|s,a)$ is a distribution of next states, such that $T(s'|s,a)$ is the probability that the agent ends up in state $s'$ after executing action $a$ in state $s$,
+\item $R(s,a)$ is the amount of reward an agent obtains after executing action $a$ in state $s$,
+\item $I(\cdot)$ is a distribution of initial states in which the agent may start the task,
+\item $\mathcal{F}$ is a set of terminal states in which the task is completed.
+\end{itemize}
+
+The agent begins the task in state $s_0 \sim I$. At each time step $t$, the agent performs action $a_t$ that takes it from state $s_t$ to state $s_{t+1} \sim T(\cdot|s_t,a_t)$ and receives reward $r_t \sim R(s_t, a_t)$. The agent is said to follow a policy $\pi$ if it chooses its actions according to $a_t \sim \pi(\cdot|s_t)$. For a fixed policy $\pi$, the total expected discounted reward for a given state $s$ is the sum of all future rewards that the agent will receive, on average, if it starts in state $s$ and follows $\pi$:
+
+\[
+V_{\pi}(s) = \mathbb{E}_{\pi} \left[  \sum_{t=0}^{\infty} \gamma^{t} r_t \middle| s_0 = s \right] ,
+\]
+
+where $\gamma$ is the discount rate which determines the present value of future rewards. The goal of the agent is to select an optimal policy $\pi^*$ that maximizes $V_{\pi^*}(s)$. The optimal value function $V_{\pi^*}(s)$ satisfies the Bellman optimality equation \cite{Bellman1957}:
+
+\begin{align*}
+V_{\pi^*}(s) = \max_a  \left\{ R(s,a) + \sum_{s'} V_{\pi^*}(s') \,\, T(s'|s,a) \right\} .
+\end{align*}
+
+which serves as a basis of a number of algorithms for solving optimal control problems. RL algorithms often fall into one of two broad categories: model-free algorithms, in which the agent learns $V_\pi$ directly; and model-based algorithms, in which the agent learns $R$ and $T$ to compute $V_\pi$. 
+
+Computational cognitive neuroscience has borrowed this dichotomy as a formal description of the distinction between habitual and goal-directed behaviors \cite{Dolan2013}. Model-free accounts of habitual behaviors posit that animals learn automatic responses to stimuli if they tend to lead to rewarding outcomes. Model-based accounts of goal-directed behaviors posit that animals learn the statistics of the environment independently of the rewards.
+
+Model-free accounts are less computationally intensive, however they require many training examples and have to be re-trained whenever the reward distribution changes. This is consistent with empirical observations that overtrained animals exhibit fast reaction times and rigid behavioral patterns that tend to persist even reward contingencies change. Conversely, model-based accounts predict that agents will flexibly adapt to changes in reward distributions, at the cost of slower reaction times due to the greater computational complexity.
+
+\subsection{Hierarchical Reinforcement Learning and semi-Markov Decision Processes}
+
+
+From a computational standpoint, 
+
+
+
+\begin{align*}
+\bar{T} \sim \text{GEM}(...) \\
+T(.|s) = T_s \sim \text{DP}(..., \bar{T}) \\
+\phi_s \sim H \\
+s_t \sim T_{s_{t-1}} \\
+o_t \sim F(\phi_{s_t})
+\end{align*}
+
+
+\subsection{hierarchical iHMM as HDP}
+
+
+\begin{align*}
+\beta \sim \text{GEM}(...) \\
+z_s \sim \text{Mult}(\beta) \\
+\bar{T} \sim \text{GEM}(...) \\
+\bar{T}_c \sim \text{DP}(..., \bar{T}) \\
+T(.|s) = T_s \sim \text{DP}(..., \bar{T}_{z_s}) \\
+\phi_s \sim H \\
+s_t \sim T_{s_{t-1}} \\
+o_t \sim F(\phi_{s_t})
+\end{align*}
+
+
+\begin{align*}
+H_c \sim ... \\
+\phi_s \sim H_{z_s}
+\end{align*}
+
+
+\subsection{hierarchical iHMM as HDP, version 2}
+
+
+
+\begin{align*}
+\bar{T} \sim \text{GEM}(...) \\
+T(.|c) = T_c \sim \text{DP}(..., \bar{T}) \\
+\bar{T}_{c,\cdot} \sim \text{GEM}(...) \\
+T(. \in c | s \in c) = T_{c,s} \sim \text{DP}(..., \bar{T}_{c,\cdot}) \\
+T_s(s') = T(s'|s) = \begin{cases}  T_{c,s}(s') \,\, T_c(c) & \text{ if } s, s' \in c \\  \bar{T}_{c',\cdot}(s') \,\, T_c(c') & \text{ if } s \in c, s' \in c'  \end{cases} \\
+\phi_s \sim H \\
+s_t \sim T_{s_{t-1}} \\
+o_t \sim F(\phi_{s_t})
+\end{align*}
+
+
+\subsection{hierarchical iHMM as HDP, version 3}
+
+
+
+\begin{align*}
+\beta \sim \text{GEM}(...) \\
+z_c \sim \text{Mult}(\beta) \\
+\bar{T}_{g,\cdot} \sim \text{GEM}(...) \\
+T_{g,s} \sim \text{DP}(..., \bar{T}_{g,\cdot}) \\
+\bar{T} \sim \text{GEM}(...) \\
+T(.|c) = T_c \sim \text{DP}(..., \bar{T}) \\
+\bar{T}_{c,\cdot} = \bar{T}_{g=z_c,\cdot} \\
+T(. \in c | s \in c) = T_{c,s} = T_{g=z_c,s}\\
+T_s(s') = T(s'|s) = \begin{cases}  T_{c,s}(s') \,\, T_c(c) & \text{ if } s, s' \in c \\  \bar{T}_{c',\cdot}(s') \,\, T_c(c') & \text{ if } s \in c, s' \in c'  \end{cases} \\
+\phi_s \sim H \\
+s_t \sim T_{s_{t-1}} \\
+o_t \sim F(\phi_{s_t})
+\end{align*}
+
+
+\bibliographystyle{unsrt}
+\renewcommand{\refname}{Bibliography \& References Cited}
+\bibliography{ihmm_stuff.bib}
+
+
+
+
+\end{document}  

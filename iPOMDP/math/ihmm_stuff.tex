@@ -38,17 +38,19 @@ Multi-task POMDP
 
 \subsection{Reinforcement Learning and Markov Decision Processes}
 
-In reinforcement learning (RL), tasks are traditionally represented as Markov Decision Processes (MDPs) \cite{Sutton1998}. We define an MDP as a tuple $(\mathcal{S}, \mathcal{A}, T, R, I, \mathcal{F})$ where:
+In reinforcement learning (RL), tasks are traditionally represented as Markov decision processes (MDPs) \cite{Sutton1998}. We define an MDP as a tuple $(\mathcal{S}, \mathcal{A}, T, R, I, \mathcal{F})$ where:
 \begin{itemize}
 \item $\mathcal{S}$ is a set of states that the agent can occupy,
 \item $\mathcal{A}$ is a set of actions that the agent can perform in those states,
-\item $T(\cdot|s,a)$ is a distribution of next states, such that $T(s'|s,a)$ is the probability that the agent ends up in state $s'$ after executing action $a$ in state $s$,
+\item $T(\cdot|s,a)$ is a distribution of next states, such that $T(s'|s,a)$ is the probability that the agent ends up in state $s' \in \mathcal{S}$ after executing action $a \in \mathcal{A}$ in state $s \mathcal{S}$,
 \item $R(s,a)$ is the amount of reward an agent obtains after executing action $a$ in state $s$,
 \item $I(\cdot)$ is a distribution of initial states in which the agent may start the task,
 \item $\mathcal{F}$ is a set of terminal states in which the task is completed.
 \end{itemize}
 
-The agent begins the task in state $s_0 \sim I$. At each time step $t$, the agent performs action $a_t$ that takes it from state $s_t$ to state $s_{t+1} \sim T(\cdot|s_t,a_t)$ and receives reward $r_t \sim R(s_t, a_t)$. The agent is said to follow a policy $\pi$ if it chooses its actions according to $a_t \sim \pi(\cdot|s_t)$. For a fixed policy $\pi$, the total expected discounted reward for a given state $s$ is the sum of all future rewards that the agent will receive, on average, if it starts in state $s$ and follows $\pi$:
+The agent begins the task in state $s_0 \sim I$. At each time step $t$, the agent performs action $a_t$ that takes it from state $s_t$ to state $s_{t+1} \sim T(\cdot|s_t,a_t)$ and receives reward $r_t \sim R(s_t, a_t)$. The agent is said to follow a policy $\pi$ if it chooses its actions according to $a_t \sim \pi(\cdot|s_t)$.
+
+For a fixed policy $\pi$, the state-value function $V_\pi(s)$ represents the total expected discounted reward for each state $s$. It is the sum of all future rewards that the agent will receive, on average, if it starts in state $s$ and follows $\pi$:
 
 \[
 V_{\pi}(s) = \mathbb{E}_{\pi} \left[  \sum_{t=0}^{\infty} \gamma^{t} r_t \middle| s_0 = s \right] ,
@@ -57,19 +59,72 @@ V_{\pi}(s) = \mathbb{E}_{\pi} \left[  \sum_{t=0}^{\infty} \gamma^{t} r_t \middle
 where $\gamma$ is the discount rate which determines the present value of future rewards. The goal of the agent is to select an optimal policy $\pi^*$ that maximizes $V_{\pi^*}(s)$. The optimal value function $V_{\pi^*}(s)$ satisfies the Bellman optimality equation \cite{Bellman1957}:
 
 \begin{align*}
-V_{\pi^*}(s) = \max_a  \left\{ R(s,a) + \sum_{s'} V_{\pi^*}(s') \,\, T(s'|s,a) \right\} .
+V_{\pi^*}(s) = \max_a  \left\{ R(s,a) + \gamma \sum_{s'} V_{\pi^*}(s') \,\, T(s'|s,a) \right\} 
 \end{align*}
 
-which serves as a basis of a number of algorithms for solving optimal control problems. RL algorithms often fall into one of two broad categories: model-free algorithms, in which the agent learns $V_\pi$ directly; and model-based algorithms, in which the agent learns $R$ and $T$ to compute $V_\pi$. 
+The Bellman equation serves as a basis of a number of algorithms for solving optimal control problems.
 
-Computational cognitive neuroscience has borrowed this dichotomy as a formal description of the distinction between habitual and goal-directed behaviors \cite{Dolan2013}. Model-free accounts of habitual behaviors posit that animals learn automatic responses to stimuli if they tend to lead to rewarding outcomes. Model-based accounts of goal-directed behaviors posit that animals learn the statistics of the environment independently of the rewards.
+RL algorithms often fall into one of two broad categories: model-free algorithms, in which the agent learns $V_\pi$ directly; and model-based algorithms, in which the agent learns $R$ and $T$ to compute $V_\pi$.  Computational cognitive neuroscience has borrowed this dichotomy as a formal description of the distinction between habitual and goal-directed behaviors \cite{Dolan2013}. Model-free accounts of habitual behaviors posit that animals learn automatic responses to stimuli if they tend to lead to rewarding outcomes. Model-based accounts of goal-directed behaviors posit that animals learn the statistics of the environment independently of the rewards.
 
-Model-free accounts are less computationally intensive, however they require many training examples and have to be re-trained whenever the reward distribution changes. This is consistent with empirical observations that overtrained animals exhibit fast reaction times and rigid behavioral patterns that tend to persist even reward contingencies change. Conversely, model-based accounts predict that agents will flexibly adapt to changes in reward distributions, at the cost of slower reaction times due to the greater computational complexity.
+Model-free accounts are less computationally intensive, however they require many training examples and have to be re-trained whenever the reward distribution changes. This is consistent with empirical observations that overtrained animals exhibit fast reaction times and rigid behavioral patterns that tend to persist even reward contingencies change. Conversely, model-based accounts predict that agents will flexibly adapt to changes in reward distributions, at the cost of slower reaction times due to the greater computational complexity. Model-based accounts explain phenomena such as latent learning and accord with the intuition that people don't have to learn a new policy, say, every time they go shopping for different groceries.
 
-\subsection{Hierarchical Reinforcement Learning and semi-Markov Decision Processes}
+\subsection{Hierarchical Reinforcement Learning and Semi-Markov Decision Processes}
+
+A long-standing challenge for traditional RL is the combinatorial explosion that occurs when planning and learning take place over long time horizons. This challenge been addressed by hierarchical reinforcement learning (HRL), which breaks down the problem into sub-problems at multiple levels of abstraction.
+
+One strand of HRL extends the agent's action repertoire to include \textit{options} \cite{Sutton1999} -- temporally-extended sequences of actions, sometimes referred to as subroutines, partial policies, or macro-actions. Each option consists of a sequence of actions that are executed as a single behavioral unit. Actions in the original MDP are referred to as \textit{primitive actions}, in order to distinguish them from options.
+
+Formally, including options turns the underlying MDP into a discrete-time semi-Markov decision process (SMDP), which allows transitions between states to take variable amounts of time. Thus we augment the original MDP with the following definitions:
+
+\begin{itemize}
+\item $\mathcal{O}$ is a set of options,
+\item $\pi_o$ is a policy for each option $o \in \mathcal{O}$, such that while $o$ is being executed, actions are selected according to $a \sim \pi_o(\cdot|s)$,
+\item $\mathcal{F}_o$ is a set of subgoal states for each option $o$, such that $\pi_o$ terminates when reaching any one of those states,
+\item $T(\cdot,\cdot|s,o)$ is a joint distribution of terminal states and step counts for each option $o$, such that $T(s',t|s,o)$ is the probability that the agent ends up in subgoal state $s' \in \mathcal{F}_o$ exactly $t$ time steps after executing option $o \in \mathcal{O}$ in state $s \in \mathcal{S}$,
+\item $R(s,o)$ is the total expected discounted reward for starting in state $s$ and executing option $o$.
+\end{itemize}
+
+The rewards can be computed as:
+
+\begin{align*}
+R(s,o) = \mathbb{E} \left[ \sum_{t=0}^\infty \gamma^t r_t \middle| s_0 = s, a_t \sim \pi_o \right]
+\end{align*}
+
+It is also convenient to define a discounted distribution of terminal states \cite{Sutton1999}:
+
+\begin{align*}
+T_\gamma(s'|s,o) = \sum_{t=0}^\infty T(s',t|s,a) \gamma^t
+\end{align*}
+
+In the SMDP, the agent follows a policy $\mu$ defined over options, such that options are chosen according to $o_t \sim \mu(\cdot|s_t)$. The Bellman equation for the optimal options policy $\mu^*$ thus becomes:
+
+\begin{align*}
+V_{\mu^*}(s) = \max_o  \left\{ R(s,o) + \sum_{s'} V_{\mu^*}(s') \,\, T_\gamma(s'|s,o) \right\} 
+\end{align*}
+
+An options policy $\mu$ in the SMDP uniquely determines a \textit{flat policy} $\pi$ consisting solely of primitive actions in the original MDP. Thus any solution of the SMDP can be mapped back to a solution in the original MDP.
+
+Introducing options allows agent to perform ``jumps'' in the state space. Choosing an option $o$ takes the agent to any subgoal state $s' \in \mathcal{F}_o$ .......... and automatically execute all primitive actions required to get there, without performing any additional computations. If the subgoals and the options policies are chosen appropriately, exploration and planning can be performed much more efficiently by allowing the agent reason over a short sequence of options, rather than a long sequence of primitive actions.
 
 
-From a computational standpoint, 
+
+
+
+
+
+
+
+The Bellman equation thu
+
+Options 
+
+The \textit{flat} policy 
+
+Flat policy 
+
+challenges addressed
+cognitive neuroscience (botvinick)
+
 
 
 

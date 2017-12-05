@@ -1,6 +1,11 @@
 \BOOKMARK [1][-]{section.1}{Background}{}% 1
 \BOOKMARK [2][-]{subsection.1.1}{Reinforcement Learning and Markov Decision Processes}{section.1}% 2
-\BOOKMARK [2][-]{subsection.1.2}{Hierarchical Reinforcement Learning and Semi-Markov Decision Processes}{section.1}% 3
-\BOOKMARK [2][-]{subsection.1.3}{hierarchical iHMM as HDP}{section.1}% 4
-\BOOKMARK [2][-]{subsection.1.4}{hierarchical iHMM as HDP, version 2}{section.1}% 5
-\BOOKMARK [2][-]{subsection.1.5}{hierarchical iHMM as HDP, version 3}{section.1}% 6
+\BOOKMARK [3][-]{subsubsection.1.1.1}{RL in the Brain}{subsection.1.1}% 3
+\BOOKMARK [2][-]{subsection.1.2}{Hierarchical Reinforcement Learning and Semi-Markov Decision Processes}{section.1}% 4
+\BOOKMARK [3][-]{subsubsection.1.2.1}{HRL in the Brain}{subsection.1.2}% 5
+\BOOKMARK [2][-]{subsection.1.3}{Option Discovery and Transfer}{section.1}% 6
+\BOOKMARK [2][-]{subsection.1.4}{Multi-task Reinforcement Learning}{section.1}% 7
+\BOOKMARK [3][-]{subsubsection.1.4.1}{MTRL for HRL}{subsection.1.4}% 8
+\BOOKMARK [2][-]{subsection.1.5}{hierarchical iHMM as HDP}{section.1}% 9
+\BOOKMARK [2][-]{subsection.1.6}{hierarchical iHMM as HDP, version 2}{section.1}% 10
+\BOOKMARK [2][-]{subsection.1.7}{hierarchical iHMM as HDP, version 3}{section.1}% 11

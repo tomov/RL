@@ -12,7 +12,7 @@
 
 \newtheorem{claim}{Claim}
 
-\title{Hierarchical iPOMDPs for MTRL}
+\title{Hierarchical iPOMDPs for HRL}
 \author{Momchil}
 %\date{Nov 2, 2017}                                           % Activate to display a given date or no date
 
@@ -38,7 +38,7 @@ Multi-task POMDP
 
 \subsection{Reinforcement Learning and Markov Decision Processes}
 
-In reinforcement learning (RL), tasks are traditionally represented as Markov decision processes (MDPs) \cite{Sutton1998}. We define an MDP as a tuple $(\mathcal{S}, \mathcal{A}, T, R, I, \mathcal{F})$ where:
+In reinforcement learning (RL), tasks are traditionally represented as Markov decision processes (MDPs) \cite{Sutton1998} and we will use those two terms interchangably. We define an MDP as a tuple $(\mathcal{S}, \mathcal{A}, T, R, I, \mathcal{F})$ where:
 \begin{itemize}
 \item $\mathcal{S}$ is a set of states that the agent can occupy,
 \item $\mathcal{A}$ is a set of actions that the agent can perform in those states,
@@ -64,9 +64,13 @@ V_{\pi^*}(s) = \max_a  \left\{ R(s,a) + \gamma \sum_{s'} V_{\pi^*}(s') \,\, T(s'
 
 The Bellman equation serves as a basis of a number of algorithms for solving optimal control problems.
 
+\subsubsection{RL in the Brain}
+
 RL algorithms often fall into one of two broad categories: model-free algorithms, in which the agent learns $V_\pi$ directly; and model-based algorithms, in which the agent learns $R$ and $T$ to compute $V_\pi$.  Computational cognitive neuroscience has borrowed this dichotomy as a formal description of the distinction between habitual and goal-directed behaviors \cite{Dolan2013}. Model-free accounts of habitual behaviors posit that animals learn automatic responses to stimuli if they tend to lead to rewarding outcomes. Model-based accounts of goal-directed behaviors posit that animals learn the statistics of the environment independently of the rewards.
 
-Model-free accounts are less computationally intensive, however they require many training examples and have to be re-trained whenever the reward distribution changes. This is consistent with empirical observations that overtrained animals exhibit fast reaction times and rigid behavioral patterns that tend to persist even reward contingencies change. Conversely, model-based accounts predict that agents will flexibly adapt to changes in reward distributions, at the cost of slower reaction times due to the greater computational complexity. Model-based accounts explain phenomena such as latent learning and accord with the intuition that people don't have to learn a new policy, say, every time they go shopping for different groceries.
+Model-free accounts are less computationally intensive, however they require many training examples and have to be re-trained whenever the reward distribution changes. This is consistent with empirical observations that overtrained animals exhibit fast reaction times and rigid behavioral patterns that tend to persist even reward contingencies change. Model-free accounts are further bolstered by the hallmark discovery that the phasic firing of midbrain dopaminergic neurons closely tracks the model-free reward prediction error (RPE) signal.
+
+Model-based accounts, on the other hand, predict that agents will flexibly adapt to changes in reward distributions, at the cost of slower reaction times due to the greater computational complexity. Model-based accounts explain phenomena such as latent learning and accord with the intuition that people don't have to learn a new policy, say, every time they go shopping for different groceries.
 
 \subsection{Hierarchical Reinforcement Learning and Semi-Markov Decision Processes}
 
@@ -104,26 +108,60 @@ V_{\mu^*}(s) = \max_o  \left\{ R(s,o) + \sum_{s'} V_{\mu^*}(s') \,\, T_\gamma(s'
 
 An options policy $\mu$ in the SMDP uniquely determines a \textit{flat policy} $\pi$ consisting solely of primitive actions in the original MDP. Thus any solution of the SMDP can be mapped back to a solution in the original MDP.
 
-Introducing options allows agent to perform ``jumps'' in the state space. Choosing an option $o$ takes the agent to any subgoal state $s' \in \mathcal{F}_o$ .......... and automatically execute all primitive actions required to get there, without performing any additional computations. If the subgoals and the options policies are chosen appropriately, exploration and planning can be performed much more efficiently by allowing the agent reason over a short sequence of options, rather than a long sequence of primitive actions.
+Introducing options allows agent to perform ``jumps'' in the state space. When considering an option $o$, the agent only needs to compute the value of its subgoal states $s' \in \mathcal{F}_o$, without computing the values of intermediate states that will be traversed while executing the option. If the subgoals and the options policies are chosen appropriately, exploration and planning can be performed much more efficiently by allowing the agent reason over short sequences of options, rather than over long sequences of primitive actions.
+
+\subsubsection{HRL in the Brain}
+
+In addition to its computational benefits, HRL provides an appealing account of habitual behaviors \cite{Botvinick2008} that competes with model-free RL. Model-free RL fails to capture habits which unfold as sequences of actions in response to a single cue, disregarding intervening cues \cite{Dezfouli2013}. It also fails to specify how habitual responses can be generalized across multiple task contexts.
+
+Options as defined in HRL map nicely to habitual action sequences and their neural substrates. Research on rodents has implicated striatal and midbrain neurons in the formation and initiation of habitual action sequences, with task-bracketing activity emerging over the course of training in both regions \cite{Smith2013, Jin2014}. In these tasks, ``bumps'' of neural activity emerge at key decision points during the trial (e.g., at the trial start or at maze junctions), while activity is generally low in the remainder of the trial (e.g., while running straight). Similar task-bracketing activity has also been observed in birds and primates, suggesting a conserved neural implementation \cite{Smith2013}. The acquisition, initiation and termination of options in HRL may account for these diverse findings.
+
+Additionally, the HRL framework has been directly supported by both behavioral \cite{Botvinick2014} and neural evidence \cite{Ribas-Fernandes2011}. It is also consistent with our intuition that people can plan over different time scales (e.g., go shopping, pick up the kids, etc.) without being bogged down by the details (e.g., get up, turn left, step forward, etc.).
 
 
+\subsection{Option Discovery and Transfer}
+
+The traditional HRL does not specify how options are transferred across tasks. Intuitively, under some circumstances, transferring an option from a previous task would speed up learning on a novel task (for example, learning to make a cup of coffee after learning to make a cup of tea). In other instances, learning a new task might be inhibited by previously acquired options, such as the tendency to get stuck in pre-existing ways of thinking that preclude creative solutions to new problems, a phenomenon known as the Einstellung effect \cite{Bilalic2008}. HRL does not make it clear why an agent faced with a new task would choose to execute an option acquired in a previous task, particularly if the state space of the new task is different. The problem of transferring behaviors from a source task to a target task has been investigated in the field of transfer learning and is often solved via an explicit inter-task mapping between states in the two tasks \cite{Taylor2009}. This mapping is often supplied manually or is discovered offline via batch heuristic methods which lack biological plausibility.
+
+Furthermore, HRL fails to specify how options are learned in the first place, with most HRL accounts assuming a pre-specified set of options \cite{Botvinick2008}. The problem of discovering useful options has traditionally been addressed in an ad-hoc fashion, often by breaking down a task into multiple sub-tasks and defining the optimal solution to each sub-task as a separate option. The sub-tasks are often defined either by manually designating certain states as subgoal states using internal rewards (``pseudo-rewards''), or by partitioning the original task space based on the topology of the state transition structure (for example, by identifying ``bottleneck'' states such as doorways, or clusters of interconnected states such as rooms) \cite{Botvinick2008}. Solway et al. \cite{Solway2014} proposed a more principled solution based on Bayesian model selection. In their study, they showed that useful options can be learned by considering an ensemble of tasks occurring in the same environment. Human behavior was consistent with a decomposition of the environment into sub-tasks, each solved by a corresponding option, such that the resulting task hierarchy yields the most parsimonious explanation of optimal behaviors in the full task ensemble.
+
+Even though it is limited by strong assumptions about the state space and the transition dynamics, the approach of Solway et al. highlights the importance of explicitly considering a distribution of tasks. In fact, most heuristic approaches to option discovery implicitly assume a task distribution, often by assuming that each accessible state has equal probability of being the start state or the goal state. To illustrate why option discovery only makes sense in the context of ensembles of tasks, consider what would happen if the agent only ever faced a single task in the world: it could then just learn the optimal policy for that one task using regular RL. Options in the HRL sense would thus be unnecessary as the entire policy would be executed automatically, like a single option. Options thus imply a world with multiple tasks. However, if those tasks were completely unrelated, options would again not make sense as the agent would have to learn a separate policy for each task from scratch, much like in the single-task scenario. In order for the agent to be able to learn useful options that can be transferred across tasks, there must be a shared structure between those tasks. While this point may seem trivial, we believe it lies at the crux of understanding how people and animals acquire their rich repertoire of habitual behaviors.
+
+In order to understand how options are learned and facilitate performance on novel tasks, it is therefore necessary to define a probability distribution over tasks in the environment. Crucially, this distribution of tasks would be highly structured \cite{Botvinick2015}, such that tasks are grouped into families of tasks that share certain parameters which are not directly observable. Hierarchy discovery would thus correspond to a particular kind of hidden state inference, where the hidden state refers to the parameters that govern the distribution of tasks.
+
+\subsection{Multi-task Reinforcement Learning}
+
+\begin{figure}
+\centering
+\includegraphics[scale=0.7,  trim = 0 120 400 10]{figures/wilson.pdf}
+\caption{(A) The MTRL framework, (B) MTRL with classes of tasks. Adapted from \cite{Wilson2007}.}
+\label{fig:mtrl}
+\end{figure}
+
+The problem of optimizing behaviors for a set of tasks (MDPs) drawn from a common distribution is the focus of multi-task reinforcement learning (MTRL) \cite{Wilson2007}. In MTRL, MDPs are assumed to be drawn from the same prior distribution. Experiencing a sequence of MDPs can allow the agent to infer the hidden parameters of the distribution and to quickly discover the optimal policy for a new MDP drawn from the same distribution.
+
+Wilson et al. \cite{Wilson2007} extended this framework to include \textit{classes} of tasks, where each class defines its own distribution of MDPs (Figure~\ref{fig:mtrl}). Their model allows the agent to rapidly discover the structure of tasks similar to previous tasks, while simultaneously supporting the discovery of entirely new classes of tasks. Policies acquired in old tasks can thus be adapted to new tasks from the same class.
+
+\subsubsection{MTRL for HRL}
+
+While Wilson et al.'s approach beings to address the question of policy transfer across MDPs, it leaves open several questions:
+
+\begin{itemize}
+\item How does ambiguity between MDPs arise? Traditional tabular MDPs assume that the agent is fully aware of what state it is in, which implies it is also fully aware of which MDP it is in. In order to be able to perform inference over MDPs, it must be the case that states are in some sense ``shared'' across MDPs, or at least ``look similar''.
+\item What are the distributions over MDPs? Intuitively, they should be generic enough to capture a wide variety of tasks that agents may encounter in the world, while being constrained enough to facilitate efficient learning and generalization.
+\item Why would options arise? In order to be able to define useful options and convert a given MDP into an SMDP, there must be some form of modular or subtask structure build into the MDP.
+\item Why would options be transferred? In order to transfer options, the modules or subtasks need to be shared across MDPs.
+\end{itemize}
+
+We address the first question by appealing to the formalism of partially observable Markov decision processes (POMDPs), in which states are not directly observable but instead define distributions over observations. The agent must thus infer which state it is in based on these observations. In MTRL with POMDPs \cite{Li2009}, the agent additionally infers which POMDP it is in.
+
+We address the second question using infinite POMDPs (iPOMDPs) \cite{DoshiVelez2009}, which allow the agent to flexibly adapt to environments with different state spaces.
+
+We address the third question by constraining the iPOMDPs to a particular modular structure, such that states are grouped into \textit{communities} of states. This is a novel contribution of our work.
+
+We address the last question by allowing the structure and properties of these communities to be shared across different iPOMDPs.
 
 
-
-
-
-
-
-The Bellman equation thu
-
-Options 
-
-The \textit{flat} policy 
-
-Flat policy 
-
-challenges addressed
-cognitive neuroscience (botvinick)
 
 
 

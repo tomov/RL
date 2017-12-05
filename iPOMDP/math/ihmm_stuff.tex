@@ -12,7 +12,7 @@
 
 \newtheorem{claim}{Claim}
 
-\title{Hierarchical iPOMDPs for HRL}
+\title{Modular iPOMDPs for HRL}
 \author{Momchil}
 %\date{Nov 2, 2017}                                           % Activate to display a given date or no date
 
@@ -127,7 +127,7 @@ Furthermore, HRL fails to specify how options are learned in the first place, wi
 
 Even though it is limited by strong assumptions about the state space and the transition dynamics, the approach of Solway et al. highlights the importance of explicitly considering a distribution of tasks. In fact, most heuristic approaches to option discovery implicitly assume a task distribution, often by assuming that each accessible state has equal probability of being the start state or the goal state. To illustrate why option discovery only makes sense in the context of ensembles of tasks, consider what would happen if the agent only ever faced a single task in the world: it could then just learn the optimal policy for that one task using regular RL. Options in the HRL sense would thus be unnecessary as the entire policy would be executed automatically, like a single option. Options thus imply a world with multiple tasks. However, if those tasks were completely unrelated, options would again not make sense as the agent would have to learn a separate policy for each task from scratch, much like in the single-task scenario. In order for the agent to be able to learn useful options that can be transferred across tasks, there must be a shared structure between those tasks. While this point may seem trivial, we believe it lies at the crux of understanding how people and animals acquire their rich repertoire of habitual behaviors.
 
-In order to understand how options are learned and facilitate performance on novel tasks, it is therefore necessary to define a probability distribution over tasks in the environment. Crucially, this distribution of tasks would be highly structured \cite{Botvinick2015}, such that tasks are grouped into families of tasks that share certain parameters which are not directly observable. Hierarchy discovery would thus correspond to a particular kind of hidden state inference, where the hidden state refers to the parameters that govern the distribution of tasks.
+In order to understand how options are learned and facilitate performance on novel tasks, it is therefore necessary to define a probability distribution over tasks in the environment. Crucially, this distribution of tasks would be highly structured \cite{Botvinick2015}, such that tasks are grouped into families of tasks that share certain parameters which are not directly observable. Option discovery would thus correspond to a particular kind of hidden state inference, where the hidden state refers to the parameters that govern the distribution of tasks.
 
 \subsection{Multi-task Reinforcement Learning}
 
@@ -157,9 +157,9 @@ We address the first question by appealing to the formalism of partially observa
 
 We address the second question using infinite POMDPs (iPOMDPs) \cite{DoshiVelez2009}, which allow the agent to flexibly adapt to environments with different state spaces.
 
-We address the third question by constraining the iPOMDPs to a particular modular structure, such that states are grouped into \textit{communities} of states. This is a novel contribution of our work.
+We address the third question by constraining the iPOMDPs to a particular modular structure, such that states are grouped into \textit{modules}, sometimes referred to as communities or blocks or states. This is a novel contribution of our work.
 
-We address the last question by allowing the structure and properties of these communities to be shared across different iPOMDPs.
+We address the last question by allowing the structure and properties of these modules to be shared across different iPOMDPs.
 
 
 \subsection{Partially Observable Markov Decision Processes}
@@ -209,7 +209,7 @@ Formally, we generate a model from the iPOMDP prior in the following steps:
 
 \begin{itemize}
 \item A state ``popularity'' vector $\bar{T}$ is drawn from a stick-breaking process (GEM) \cite{Teh2006} with concentration parameter $\alpha_0$, such that $\bar{T}(s')$ corresponds to the average probability that a transition will lead to state $s'$.
-\item A transition probability vector $T(\cdot | s,a)$ is drawn from a Dirichlet process (DP) \cite{Teh2006} with concentration parameter $\alpha_1$ and base distribution $\bar{T}$.
+\item A transition probability vector $T(\cdot | s,a)$ is drawn from a Dirichlet process (DP) \cite{Teh2006} with concentration parameter $\alpha_1$ and base distribution $\bar{T}$ for each state-action pair $(s,a)$.
 \item An observation distribution $O(\cdot|s,a)$ is drawn from a base distribution $H_O$ for each state-action pair $(s,a)$.
 \item A reward distribution $R(\cdot|s,a)$ is drawn from a base distribution $H_R$ for each state-action pair $(s,a)$.
 \item States $s_t$, observations $o_t$, and rewards $r_t$ are drawn as usual from their corresponding distributions.
@@ -218,13 +218,13 @@ Formally, we generate a model from the iPOMDP prior in the following steps:
 The steps can be summarized as:
 
 \begin{align*}
-\bar{T} \sim \text{GEM}(\alpha_0) \\
-T(\cdot | s,a) \sim \text{DP}(\alpha_1, \bar{T}) \\
-O(\cdot | s,a) \sim H_O \\
-R(\cdot | s,a) \sim H_R \\
-s_t \sim T(\cdot | s_{t-1},a_{t-1}) \\
-o_t \sim O(\cdot | s_{t-1}, a_{t-1}) \\
-r_t \sim R(\cdot | s_{t-1}, a_{t-1}) 
+\bar{T} \sim \text{GEM}(\alpha_0)  		&& \text{average transition distribution} \\
+T(\cdot | s,a) \sim \text{DP}(\alpha_1, \bar{T})		 && \text{transition distributions}\\
+O(\cdot | s,a) \sim H_O 				&& \text{observation distributions}\\
+R(\cdot | s,a) \sim H_R 				&& \text{reward distributions}\\
+s_t \sim T(\cdot | s_{t-1},a_{t-1}) 		&& \text{states}\\
+o_t \sim O(\cdot | s_{t-1}, a_{t-1})		&& \text{observations} \\
+r_t \sim R(\cdot | s_{t-1}, a_{t-1})		&& \text{rewards} 
 \end{align*}
 
 The popularity vector $\bar{T}$ and the transition vectors $T(\cdot | s,a)$ are of infinite size. However, the generative process favors a small number of states, and hence most of the probability mass will be concentrated on low-numbered states. The extent to which the model prefers ``small'' states is controlled by the concentration parameter $\alpha_0$. The concentration parameter $\alpha_1$ determines the similarity between each transition distribution $T(\cdot | s,a)$ and the mean distribution $\bar{T}$. 
@@ -234,6 +234,64 @@ Importantly, since the agent can only perceive a finite number of observations d
 \section{The Model}
 
 \subsection{Modular iPOMDPs}
+
+Combining MTRL with iPOMDPs allows the agent to learn and transfer policies across tasks with arbitrary state spaces and transition structures. However, it is still unclear how options would arise in such a framework. Intuitively, options imply a certain modular structure, such that some parts of the state space have characteristic transition functions or observation distributions which are repeated across POMDPs or even within the same POMDP. Learning an appropriate sequence of actions in one of those modules will allow the agent to transfer it to other instances of the same module. 
+
+\subsubsection{Modular iPOMDPs using repeated transition functions}
+
+One way to incorporate modules in iPOMDPs is by extending block diagonal infinite hidden Markov models (BD-iHMMs) \cite{Stepleton2009}. Intuitively, each state is assigned to a module, and states from the same module tend to transition to states within the module more often than to states outside of the module. As an example, modules can be thought of as rooms, while states in each module can be thought of as locations within the room.
+
+Formally, we can introduce the following:
+
+\begin{itemize}
+\item $\mathcal{M}$ is a set of modules,
+\item $\bar{T}_m$ is a state popularity vector for each module $m \in \mathcal{M}$,
+\item $z_s \in \mathcal{M}$ is the module that state $s \in \mathcal{S}$ belongs to.
+\end{itemize}
+
+To generate a modular iPOMDP:
+
+\begin{itemize}
+\item A module assignment $z_s$ is drawn for each state $s$ from a stick-breaking process with concentration parameter $\gamma$.
+\item An overall state popularity vector $\bar{T}$ is drawn from a stick-breaking process with concentration parameter $\alpha_0$.
+\item A module-specific state popularity vector $\bar{T}_m$ is created for each module $m$. It is equal to $\bar{T}$, except with $\bar{T}_m(s)$ scaled by a factor of $(1 + \xi)$ for all states $s$ such that $z_s = m$. The whole vector $\bar{T}_m$ is then renormalized to sum to 1.
+\item A transition probability vector $T(\cdot | s,a)$ is drawn from a DP with concentration parameter $\alpha_1$ and base distribution $\bar{T}_{z_s}$ for each state-action pair $(s,a)$.
+\item Reward distributions $R$, observation distributions $O$, states $s_t$, observations $o_t$, and rewards $r_t$ are drawn as for regular iPOMDPs.
+\end{itemize}
+
+The steps can be summarized as:
+
+\begin{align*}
+z_s \sim \text{GEM}(\gamma)   		&& \text{module assignments} \\
+\bar{T} \sim \text{GEM}(\alpha_0)     		&& \text{average transition distribution} \\
+C_m =  1 + \xi {\sum_s \bar{T}(s) \,\, \delta(z_s = m) }   		&& \text{normalization constant} \\
+\bar{T}_m(s) = \begin{cases} \frac{1 + \xi}{C_m} \bar{T}(s)  \,\, \text{ if }  z_s = m \\  \frac{1}{C_m} \bar{T}(s) \,\, \text{ if } z_s \ne m \end{cases}     		&& \text{average transition distribution for each module} \\ 
+T(\cdot | s,a) \sim \text{DP}(\alpha_1, \bar{T}_{z_s}) 		 && \text{transition distributions}\\
+O(\cdot | s,a) \sim H_O \\
+R(\cdot | s,a) \sim H_R \\
+s_t \sim T(\cdot | s_{t-1},a_{t-1}) \\
+o_t \sim O(\cdot | s_{t-1}, a_{t-1}) \\
+r_t \sim R(\cdot | s_{t-1}, a_{t-1}) 
+\end{align*}
+
+Unlike regular iPOMDPs, here there is a separate average transition distribution $\bar{T}_m$ for each module $m$. Importantly, that distribution is artificially skewed to prefer states within $m$. The parameter $\xi$ controls the bias for within-module transitions, with $\xi = 0$ leading to no bias. The concentration parameter $\gamma$ determines whether the prior is biased towards a small or a large number of modules.
+
+
+\subsubsection{Modular iPOMDPs using nested iPOMDPs}
+
+
+
+
+
+
+\subsection{MTRL with modular iPOMDPs}
+
+\subsubsection{Shared modules}
+
+\subsubsection{Shared observations}
+
+\subsubsection{Shared rewards}
+
 
 
 

@@ -42,7 +42,7 @@ In reinforcement learning (RL), tasks are traditionally represented as Markov de
 \begin{itemize}
 \item $\mathcal{S}$ is a set of states that the agent can occupy,
 \item $\mathcal{A}$ is a set of actions that the agent can perform in those states,
-\item $T(\cdot|s,a)$ is a distribution of next states, such that $T(s'|s,a)$ is the probability that the agent ends up in state $s' \in \mathcal{S}$ after executing action $a \in \mathcal{A}$ in state $s \mathcal{S}$,
+\item $T(\cdot|s,a)$ is a distribution of next states, such that $T(s'|s,a)$ is the probability that the agent ends up in state $s' \in \mathcal{S}$ after executing action $a \in \mathcal{A}$ in state $s \in \mathcal{S}$,
 \item $R(s,a)$ is the amount of reward an agent obtains after executing action $a$ in state $s$,
 \item $I(\cdot)$ is a distribution of initial states in which the agent may start the task,
 \item $\mathcal{F}$ is a set of terminal states in which the task is completed.
@@ -138,9 +138,9 @@ In order to understand how options are learned and facilitate performance on nov
 \label{fig:mtrl}
 \end{figure}
 
-The problem of optimizing behaviors for a set of tasks (MDPs) drawn from a common distribution is the focus of multi-task reinforcement learning (MTRL) \cite{Wilson2007}. In MTRL, MDPs are assumed to be drawn from the same prior distribution. Experiencing a sequence of MDPs can allow the agent to infer the hidden parameters of the distribution and to quickly discover the optimal policy for a new MDP drawn from the same distribution.
+The problem of optimizing behaviors for a set of tasks (MDPs) drawn from a common distribution is the focus of multi-task reinforcement learning (MTRL) (Figure~\ref{fig:mtrl}A). In MTRL, MDPs are assumed to be drawn from the same prior distribution. Experiencing a sequence of MDPs can allow the agent to infer the hidden parameters of the distribution and to quickly discover the optimal policy for a new MDP drawn from the same distribution.
 
-Wilson et al. \cite{Wilson2007} extended this framework to include \textit{classes} of tasks, where each class defines its own distribution of MDPs (Figure~\ref{fig:mtrl}). Their model allows the agent to rapidly discover the structure of tasks similar to previous tasks, while simultaneously supporting the discovery of entirely new classes of tasks. Policies acquired in old tasks can thus be adapted to new tasks from the same class.
+Wilson et al. \cite{Wilson2007} extended this framework to include \textit{classes} of tasks, where each class defines its own distribution of MDPs (Figure~\ref{fig:mtrl}B). Their model allows the agent to rapidly discover the structure of tasks similar to previous tasks, while simultaneously supporting the discovery of entirely new classes of tasks. Policies acquired in old tasks can thus be adapted to new tasks from the same class.
 
 \subsubsection{MTRL for HRL}
 
@@ -162,6 +162,48 @@ We address the third question by constraining the iPOMDPs to a particular modula
 We address the last question by allowing the structure and properties of these communities to be shared across different iPOMDPs.
 
 
+\subsection{Partially Observable Markov Decision Processes}
+
+\begin{figure}
+\centering
+\includegraphics[scale=0.7,  trim = 0 10 400 10]{figures/pomdp.pdf}
+\caption{(A) A time slice of an MDP showing the dependence between successive states and actions. (B) A time slice through the POMDP. Grey circles indicate that states are not directly observable.}
+\label{fig:pomdp}
+\end{figure}
+
+Partially observable Markov decision processes (POMDPs) are useful for modeling environments in which states are not directly observable but rather generate observations, which the agent must use to infer the underlying hidden states. POMDPs extend MDPs by including the following:
+
+\begin{itemize}
+\item $\Omega$ is a set of observations,
+\item $O(\cdot|s,a)$ is a distribution of observations, such that $O(o|s,a)$ is the probability of seeing observation $o \in \Omega$ after executing action $a \in \mathcal{A}$ in state $s \in \mathcal{S}$.
+\end{itemize}
+
+In POMDPs, the agent gets an observation after each action, so the agent's history is now a sequence of the form $\mathbf{h}_t = [o_0, a_0, o_1, a_1, o_2, a_2 ... a_{t-1}, o_t]$ (Figure~\ref{fig:pomdp}B). The agent's history induces a probability distribution over the current state it is in:
+
+\begin{align*}
+b(s_t) = P(s_t | o_0, a_0 ... a_{t-1}, o_t)
+\end{align*}
+
+This summary statistic is known as a \textit{belief state}. It obeys the Markov property and can be updated recursively at each time step using Bayes' rule:
+
+\begin{align*}
+b(s_{t+1}) &=& P(s_{t+1} | o_0, a_0 ... a_t, o_{t+1})  \\
+&=& \sum_{s_t}  T(s_{t+1} | s_t, a_{t+1}) \,\, P(s_t | o_0, a_0 ... a_t, o_{t+1}) \\
+&\propto&  \sum_{s_t}  T(s_{t+1} | s_t, a_{t+1})  \,\, P(o_{t+1} | o_0, a_0 ... a_t, s_t) \,\, P(s_t | o_0, a_0 ... a_{t-1}, o_t) \\
+&=& \sum_{s_t}  T(s_{t+1} | s_t, a_{t+1}) \,\, O(o_{t+1} | s_t, a_t) \,\, b(s_t) \\
+\end{align*}
+
+Rewards are treated as additional observations (omitted here to keep the notation uncluttered).
+
+Now we can define MTRL using POMDPs \cite{Li2009}. Different POMDPs generate similar observations, creating ambiguity between POMDPs and necessitating inference over multiple POMDPs.
+
+\subsubsection{POMDPs in the Brain}
+
+Recent work \cite{Starkweather2017} using a task in which stimuli provide ambiguous information about the true state of the environment showed that the activity of midbrain dopaminergic neurons corresponds to the RPE computed on the inferred hidden state of the environment, consistent with a POMDP representation of the task.
+
+\subsection{Infinite POMDPs}
+
+In 
 
 
 

@@ -6,6 +6,9 @@
 \BOOKMARK [2][-]{subsection.1.3}{Option Discovery and Transfer}{section.1}% 6
 \BOOKMARK [2][-]{subsection.1.4}{Multi-task Reinforcement Learning}{section.1}% 7
 \BOOKMARK [3][-]{subsubsection.1.4.1}{MTRL for HRL}{subsection.1.4}% 8
-\BOOKMARK [2][-]{subsection.1.5}{hierarchical iHMM as HDP}{section.1}% 9
-\BOOKMARK [2][-]{subsection.1.6}{hierarchical iHMM as HDP, version 2}{section.1}% 10
-\BOOKMARK [2][-]{subsection.1.7}{hierarchical iHMM as HDP, version 3}{section.1}% 11
+\BOOKMARK [2][-]{subsection.1.5}{Partially Observable Markov Decision Processes}{section.1}% 9
+\BOOKMARK [3][-]{subsubsection.1.5.1}{POMDPs in the Brain}{subsection.1.5}% 10
+\BOOKMARK [2][-]{subsection.1.6}{Infinite POMDPs}{section.1}% 11
+\BOOKMARK [2][-]{subsection.1.7}{hierarchical iHMM as HDP}{section.1}% 12
+\BOOKMARK [2][-]{subsection.1.8}{hierarchical iHMM as HDP, version 2}{section.1}% 13
+\BOOKMARK [2][-]{subsection.1.9}{hierarchical iHMM as HDP, version 3}{section.1}% 14

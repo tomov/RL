@@ -138,9 +138,9 @@ In order to understand how options are learned and facilitate performance on nov
 \label{fig:mtrl}
 \end{figure}
 
-The problem of optimizing behaviors for a set of tasks (MDPs) drawn from a common distribution is the focus of multi-task reinforcement learning (MTRL) (Figure~\ref{fig:mtrl}A). In MTRL, MDPs are assumed to be drawn from the same prior distribution. Experiencing a sequence of MDPs can allow the agent to infer the hidden parameters of the distribution and to quickly discover the optimal policy for a new MDP drawn from the same distribution.
+The problem of optimizing behaviors for a set of tasks (MDPs) drawn from a common distribution is the focus of multi-task reinforcement learning (MTRL) (Figure~\ref{fig:mtrl}A). In MTRL, MDPs are assumed to be drawn from the same prior distribution. Experiencing a sequence of MDPs can allow the agent to infer the hidden parameters of the distribution and to quickly discover the optimal policy for a new MDP drawn from the same distribution. In its simplest instantiation, MTRL allows the agent to learn a ``library'' of MDPs and reuse policies from MDPs it has seen in the past.
 
-Wilson et al. \cite{Wilson2007} extended this framework to include \textit{classes} of tasks, where each class defines its own distribution of MDPs (Figure~\ref{fig:mtrl}B). Their model allows the agent to rapidly discover the structure of tasks similar to previous tasks, while simultaneously supporting the discovery of entirely new classes of tasks. Policies acquired in old tasks can thus be adapted to new tasks from the same class.
+Wilson et al. \cite{Wilson2007} extended this framework to include \textit{classes} of tasks, where each class defines its own distribution of MDPs (Figure~\ref{fig:mtrl}B). Their model allows the agent to rapidly discover the structure of tasks similar to previous tasks, while simultaneously supporting the discovery of entirely new classes of tasks. Policies acquired in old tasks can thus be adapted to new tasks from the same class, while avoiding incorrect generalization to tasks from different classes.
 
 \subsubsection{MTRL for HRL}
 
@@ -171,26 +171,26 @@ We address the last question by allowing the structure and properties of these c
 \label{fig:pomdp}
 \end{figure}
 
-Partially observable Markov decision processes (POMDPs) are useful for modeling environments in which states are not directly observable but rather generate observations, which the agent must use to infer the underlying hidden states. POMDPs extend MDPs by including the following:
+Partially observable Markov decision processes (POMDPs) are useful for modeling environments in which states are not directly observable but rather generate observations, which the agent must use to infer the underlying hidden states (Figure~\ref{fig:pomdp}B). POMDPs extend MDPs by including the following:
 
 \begin{itemize}
 \item $\Omega$ is a set of observations,
 \item $O(\cdot|s,a)$ is a distribution of observations, such that $O(o|s,a)$ is the probability of seeing observation $o \in \Omega$ after executing action $a \in \mathcal{A}$ in state $s \in \mathcal{S}$.
 \end{itemize}
 
-In POMDPs, the agent gets an observation after each action, so the agent's history is now a sequence of the form $\mathbf{h}_t = [o_0, a_0, o_1, a_1, o_2, a_2 ... a_{t-1}, o_t]$ (Figure~\ref{fig:pomdp}B). The agent's history induces a probability distribution over the current state it is in:
+In POMDPs, the agent gets an observation after each action, so the agent's history is now a sequence of the form $\mathbf{h}_t = [o_0, a_0, o_1, a_1, o_2, a_2 ... a_{t-1}, o_t]$. The agent's history induces a probability distribution over the current state it is in:
 
 \begin{align*}
-b(s_t) = P(s_t | o_0, a_0 ... a_{t-1}, o_t)
+b_t(s_t) = P(s_t | o_0, a_0 ... a_{t-1}, o_t)
 \end{align*}
 
 This summary statistic is known as a \textit{belief state}. It obeys the Markov property and can be updated recursively at each time step using Bayes' rule:
 
 \begin{align*}
-b(s_{t+1}) &=& P(s_{t+1} | o_0, a_0 ... a_t, o_{t+1})  \\
+b_{t+1}(s_{t+1}) &=& P(s_{t+1} | o_0, a_0 ... a_t, o_{t+1})  \\
 &=& \sum_{s_t}  T(s_{t+1} | s_t, a_{t+1}) \,\, P(s_t | o_0, a_0 ... a_t, o_{t+1}) \\
 &\propto&  \sum_{s_t}  T(s_{t+1} | s_t, a_{t+1})  \,\, P(o_{t+1} | o_0, a_0 ... a_t, s_t) \,\, P(s_t | o_0, a_0 ... a_{t-1}, o_t) \\
-&=& \sum_{s_t}  T(s_{t+1} | s_t, a_{t+1}) \,\, O(o_{t+1} | s_t, a_t) \,\, b(s_t) \\
+&=& \sum_{s_t}  T(s_{t+1} | s_t, a_{t+1}) \,\, O(o_{t+1} | s_t, a_t) \,\, b_t(s_t) \\
 \end{align*}
 
 Rewards are treated as additional observations (omitted here to keep the notation uncluttered).
@@ -203,18 +203,39 @@ Recent work \cite{Starkweather2017} using a task in which stimuli provide ambigu
 
 \subsection{Infinite POMDPs}
 
-In 
+In order to allow agents to learn a diverse set of tasks with different state spaces and transition functions, we turn to the formalism of infinite POMDPs (iPOMDPs) \cite{DoshiVelez2009}. This extends POMDPs in two ways. First, the transition probabilities $T$ are themselves treated as random variables with their own probability distributions. The unknown transitions $T$ together with the hidden state $s$ thus form an expanded hidden \textit{hyperstate} \cite{Duff2002}. This allows the agent to learn a POMDP with any arbitrary transition structure. Second, a nonparametric prior is defined over $T$, which allows for an unbounded number of states and transitions between them.
 
+Formally, we generate a model from the iPOMDP prior in the following steps: 
 
+\begin{itemize}
+\item A state ``popularity'' vector $\bar{T}$ is drawn from a stick-breaking process (GEM) \cite{Teh2006} with concentration parameter $\alpha_0$, such that $\bar{T}(s')$ corresponds to the average probability that a transition will lead to state $s'$.
+\item A transition probability vector $T(\cdot | s,a)$ is drawn from a Dirichlet process (DP) \cite{Teh2006} with concentration parameter $\alpha_1$ and base distribution $\bar{T}$.
+\item An observation distribution $O(\cdot|s,a)$ is drawn from a base distribution $H_O$ for each state-action pair $(s,a)$.
+\item A reward distribution $R(\cdot|s,a)$ is drawn from a base distribution $H_R$ for each state-action pair $(s,a)$.
+\item States $s_t$, observations $o_t$, and rewards $r_t$ are drawn as usual from their corresponding distributions.
+\end{itemize}
 
+The steps can be summarized as:
 
 \begin{align*}
-\bar{T} \sim \text{GEM}(...) \\
-T(.|s) = T_s \sim \text{DP}(..., \bar{T}) \\
-\phi_s \sim H \\
-s_t \sim T_{s_{t-1}} \\
-o_t \sim F(\phi_{s_t})
+\bar{T} \sim \text{GEM}(\alpha_0) \\
+T(\cdot | s,a) \sim \text{DP}(\alpha_1, \bar{T}) \\
+O(\cdot | s,a) \sim H_O \\
+R(\cdot | s,a) \sim H_R \\
+s_t \sim T(\cdot | s_{t-1},a_{t-1}) \\
+o_t \sim O(\cdot | s_{t-1}, a_{t-1}) \\
+r_t \sim R(\cdot | s_{t-1}, a_{t-1}) 
 \end{align*}
+
+The popularity vector $\bar{T}$ and the transition vectors $T(\cdot | s,a)$ are of infinite size. However, the generative process favors a small number of states, and hence most of the probability mass will be concentrated on low-numbered states. The extent to which the model prefers ``small'' states is controlled by the concentration parameter $\alpha_0$. The concentration parameter $\alpha_1$ determines the similarity between each transition distribution $T(\cdot | s,a)$ and the mean distribution $\bar{T}$. 
+
+Importantly, since the agent can only perceive a finite number of observations during its lifetime, it will only ever need to learn about a finite number of states.
+
+\section{The Model}
+
+\subsection{Modular iPOMDPs}
+
+
 
 
 \subsection{hierarchical iHMM as HDP}

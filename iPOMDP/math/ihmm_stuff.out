@@ -9,6 +9,8 @@
 \BOOKMARK [2][-]{subsection.1.5}{Partially Observable Markov Decision Processes}{section.1}% 9
 \BOOKMARK [3][-]{subsubsection.1.5.1}{POMDPs in the Brain}{subsection.1.5}% 10
 \BOOKMARK [2][-]{subsection.1.6}{Infinite POMDPs}{section.1}% 11
-\BOOKMARK [2][-]{subsection.1.7}{hierarchical iHMM as HDP}{section.1}% 12
-\BOOKMARK [2][-]{subsection.1.8}{hierarchical iHMM as HDP, version 2}{section.1}% 13
-\BOOKMARK [2][-]{subsection.1.9}{hierarchical iHMM as HDP, version 3}{section.1}% 14
+\BOOKMARK [1][-]{section.2}{The Model}{}% 12
+\BOOKMARK [2][-]{subsection.2.1}{Modular iPOMDPs}{section.2}% 13
+\BOOKMARK [2][-]{subsection.2.2}{hierarchical iHMM as HDP}{section.2}% 14
+\BOOKMARK [2][-]{subsection.2.3}{hierarchical iHMM as HDP, version 2}{section.2}% 15
+\BOOKMARK [2][-]{subsection.2.4}{hierarchical iHMM as HDP, version 3}{section.2}% 16

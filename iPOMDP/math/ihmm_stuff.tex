@@ -208,7 +208,7 @@ In order to allow agents to learn a diverse set of tasks with different state sp
 Formally, we generate a model from the iPOMDP prior in the following steps: 
 
 \begin{itemize}
-\item A state ``popularity'' vector $\bar{T}$ is drawn from a stick-breaking process (GEM) \cite{Teh2006} with concentration parameter $\alpha_0$, such that $\bar{T}(s')$ corresponds to the average probability that a transition will lead to state $s'$.
+\item A state ``popularity'' vector $\bar{T}$ is drawn from a stick-breaking process (GEM) \cite{Teh2006} with concentration parameter $\alpha_0$, such that $\bar{T}(s')$ corresponds to the average probability that a transition will lead to state $s'$. It can be thought of as the average transition distribution.
 \item A transition probability vector $T(\cdot | s,a)$ is drawn from a Dirichlet process (DP) \cite{Teh2006} with concentration parameter $\alpha_1$ and base distribution $\bar{T}$ for each state-action pair $(s,a)$.
 \item An observation distribution $O(\cdot|s,a)$ is drawn from a base distribution $H_O$ for each state-action pair $(s,a)$.
 \item A reward distribution $R(\cdot|s,a)$ is drawn from a base distribution $H_R$ for each state-action pair $(s,a)$.
@@ -237,7 +237,7 @@ Importantly, since the agent can only perceive a finite number of observations d
 
 Combining MTRL with iPOMDPs allows the agent to learn and transfer policies across tasks with arbitrary state spaces and transition structures. However, it is still unclear how options would arise in such a framework. Intuitively, options imply a certain modular structure, such that some parts of the state space have characteristic transition functions or observation distributions which are repeated across POMDPs or even within the same POMDP. Learning an appropriate sequence of actions in one of those modules will allow the agent to transfer it to other instances of the same module. 
 
-\subsubsection{Modular iPOMDPs using repeated transition functions}
+\subsubsection{Module-specific popularity vectors}
 
 One way to incorporate modules in iPOMDPs is by extending block diagonal infinite hidden Markov models (BD-iHMMs) \cite{Stepleton2009}. Intuitively, each state is assigned to a module, and states from the same module tend to transition to states within the module more often than to states outside of the module. As an example, modules can be thought of as rooms, while states in each module can be thought of as locations within the room.
 
@@ -252,21 +252,23 @@ Formally, we can introduce the following:
 To generate a modular iPOMDP:
 
 \begin{itemize}
-\item A module assignment $z_s$ is drawn for each state $s$ from a stick-breaking process with concentration parameter $\gamma$.
+\item A module popularity vector $\beta$ is drawn from a stick-breaking process with concentration parameter $\gamma$.
+\item A module assignment $z_s$ is drawn for each state $s$ from a categorial distribution defined by $\beta$.
 \item An overall state popularity vector $\bar{T}$ is drawn from a stick-breaking process with concentration parameter $\alpha_0$.
 \item A module-specific state popularity vector $\bar{T}_m$ is created for each module $m$. It is equal to $\bar{T}$, except with $\bar{T}_m(s)$ scaled by a factor of $(1 + \xi)$ for all states $s$ such that $z_s = m$. The whole vector $\bar{T}_m$ is then renormalized to sum to 1.
-\item A transition probability vector $T(\cdot | s,a)$ is drawn from a DP with concentration parameter $\alpha_1$ and base distribution $\bar{T}_{z_s}$ for each state-action pair $(s,a)$.
+\item A transition probability vector $T(\cdot | s,a)$ is drawn from a DP with concentration parameter $\alpha_1$ and base distribution $\bar{T}_m$ for each state-action pair $(s,a)$, where $m = z_s$.
 \item Reward distributions $R$, observation distributions $O$, states $s_t$, observations $o_t$, and rewards $r_t$ are drawn as for regular iPOMDPs.
 \end{itemize}
 
 The steps can be summarized as:
 
 \begin{align*}
-z_s \sim \text{GEM}(\gamma)   		&& \text{module assignments} \\
+\beta \sim \text{GEM}(\gamma)   		&& \text{module popularities} \\
+z_s \sim \beta   		&& \text{module assignments} \\
 \bar{T} \sim \text{GEM}(\alpha_0)     		&& \text{average transition distribution} \\
 C_m =  1 + \xi {\sum_s \bar{T}(s) \,\, \delta(z_s = m) }   		&& \text{normalization constant} \\
 \bar{T}_m(s) = \begin{cases} \frac{1 + \xi}{C_m} \bar{T}(s)  \,\, \text{ if }  z_s = m \\  \frac{1}{C_m} \bar{T}(s) \,\, \text{ if } z_s \ne m \end{cases}     		&& \text{average transition distribution for each module} \\ 
-T(\cdot | s,a) \sim \text{DP}(\alpha_1, \bar{T}_{z_s}) 		 && \text{transition distributions}\\
+T(\cdot | s,a) \sim \text{DP}(\alpha_1, \bar{T}_m), \text{ where } m = z_s 		 && \text{transition distributions}\\
 O(\cdot | s,a) \sim H_O \\
 R(\cdot | s,a) \sim H_R \\
 s_t \sim T(\cdot | s_{t-1},a_{t-1}) \\
@@ -276,81 +278,93 @@ r_t \sim R(\cdot | s_{t-1}, a_{t-1})
 
 Unlike regular iPOMDPs, here there is a separate average transition distribution $\bar{T}_m$ for each module $m$. Importantly, that distribution is artificially skewed to prefer states within $m$. The parameter $\xi$ controls the bias for within-module transitions, with $\xi = 0$ leading to no bias. The concentration parameter $\gamma$ determines whether the prior is biased towards a small or a large number of modules.
 
+The module-specific average transition distributions would allow the model to discover the modular or ``community'' structure of tasks in the environment that people are capable of inferring \cite{Schapiro2013, Solway2014}. However, since each transition distribution $T(\cdot|s,a)$ is drawn independently (conditional on $\bar{T}_m$), each module will have its own unique transition structure. An option learned in one module would not apply to a different module.
 
-\subsubsection{Modular iPOMDPs using nested iPOMDPs}
+\subsubsection{Nested iPOMDPs}
+
+In order to facilitate the acquisition of options, modules need to be repeated, which is infeasible with the previous approach. The easiest way to achieve this is by treating modules as self-contained units. One way to accomplish this is by inducing a separate iPOMDP for each module, which would be ``nested'' in a higher-level iPOMDP defined over modules.
+
+To illustrate this, consider the original iPOMDP formulation in which states induce distributions over observations. Now imagine that states are modules, and that the observations themselves are the states, with their own module-specific transition distributions.
+
+Formally, we can generate a two-layer iPOMDP as follows:
 
 
+\begin{itemize}
+\item A \textbf{module} popularity vector $\bar{T}$ is drawn from a stick-breaking process with concentration parameter $\alpha_0$, such that $\bar{T}(m')$ corresponds to the average probability that a transition will lead to module $m'$.
+\item A \textbf{module} transition probability vector $T(\cdot | m)$ is drawn from a DP with concentration parameter $\alpha_1$ and base distribution $\bar{T}$ for each module $m$, such that $T(m'|m)$ is the average probability that an action in a state in module $m$ will lead to a state in module $m'$.
+\item A module-specific \textbf{state} popularity vector $\bar{T}_{m}$ is drawn from a stick-breaking process with concentration parameter $\alpha_2$ for each module $m$, such that $\bar{T}_m(s')$ corresponds to the average probability that a transition within module $m$ will lead to state $s'$. This pertains to transitions from and to states within $m$ only.
+\item A module-specific \textbf{state} transition probability vector $T_m(\cdot|s,a)$ is drawn from a DP with concentration parameter $\alpha_3$ and base distribution $\bar{T}_{m}$ for each state-action pair $(s,a)$ within each module $m$. Thus $T_m(s'|s,a)$ is the probability of transitioning to state $s'$ after taking action $a$ in state $s$ within module $m$. Note that both $s$ and $s'$ belong to module $m$.
+\item Global transitions $T(s'|s,a)$ across states (both within and across modules) are defined as follows. If both $s$ and $s'$ are in the same module $m$, then $T(s'|s,a)$ equals the within-module transition probability $T_m(s'|s,a)$, scaled by the probability that a module will transition to itself, $T(m'|m)$. If $s$ and $s'$ belong to different modules $m$ and $m'$, respectively, then $T(s'|s,a)$ is taken to be the popularity of $s'$ in module $m'$, $\bar{T}_{m'}(s')$, scaled by the probability of a transition from $m$ to $m'$, $T(m'|m)$.
+\item Reward distributions $R$, observation distributions $O$, states $s_t$, observations $o_t$, and rewards $r_t$ are drawn as for regular iPOMDPs.
+\end{itemize}
 
+The steps can be summarized as:
 
+\begin{align*}
+\bar{T} \sim \text{GEM}(\alpha_0)      		&& \text{average module transition distribution}  \\
+T(.|m) \sim \text{DP}(\alpha_1, \bar{T})      		&& \text{module transition distributions} \\
+\bar{T}_{m} \sim \text{GEM}(\alpha_2)      		&& \text{average state transition distributions} \\
+T_m(\cdot|s,a) \sim \text{DP}(\alpha_3, \bar{T}_m) ,\,\,\forall s \in m      		&& \text{state transition distributions} \\
+T(s'|s,a) = \begin{cases}  T_m(s'|s,a) \,\, T(m|m) & \text{ if } s, s' \in m \\  \bar{T}_{m'}(s') \,\, T(m'|m) & \text{ if } s \in m, s' \in m'  \end{cases}			&& \text{transitions between all states} \\
+O(\cdot | s,a) \sim H_O \\
+R(\cdot | s,a) \sim H_R \\
+s_t \sim T(\cdot | s_{t-1},a_{t-1}) \\
+o_t \sim O(\cdot | s_{t-1}, a_{t-1}) \\
+r_t \sim R(\cdot | s_{t-1}, a_{t-1}) 
+\end{align*}
 
+As before, it makes sense to introduce a bias that favors transitions within modules by scaling $T(m|m)$ by a factor of $(1 + \xi)$:
 
-\subsection{MTRL with modular iPOMDPs}
+\begin{align*}
+T(m'|m) \leftarrow \begin{cases}  \frac{1 + \xi}{1 + \xi T(m|m)} \,\, T(m|m) \,\,\text{ if }m' = m    \\  \frac{1}{1 + \xi T(m|m)} \,\, T(m'|m)\,\,\text{ if }m' \ne m  \end{cases}
+\end{align*}
+
+Now each module has its own separate transition structure defined by $T_m$. Even though each module is still unique, this version of the model allows us to adapt iPOMDPs for MTRL in a way that naturally gives rise to options.
+
+\subsection{MTRL with nested iPOMDPs}
+
+There are different ways to adapt nested iPOMDPs to the MTRL framework that will facilitate the acquisition and transfer of different kinds of options.
 
 \subsubsection{Shared modules}
+
+An apparent extension is to allow transition structures to be shared between different modules. Thus two different modules $m$ and $m'$ may have identical state transition structures $T_m \equiv T_{m'}$. To accomplish this, it is convenient to introduce \textit{templates} $\tau$ that define unique transition structures $T_{\tau}$. Each module $m$ is assigned to a template $\tau$, resulting in $T_m \equiv T_\tau$. 
+
+We introduce the following components to the nested iPOMDP generation process:
+
+\begin{itemize}
+\item $\bar{T}_\tau$ and $T_\tau$ are drawn in the same way as $\bar{T}_m$ and $T_m$, respectively, except defined for templates $\tau$ instead of modules $m$.
+\item A template popularity vector $\beta$ is drawn from a stick-breaking process with concentration parameter $\gamma$.
+\item A template assignment $z_m$ is drawn for each module $m$ from a categorial distribution defined by $\beta$.
+\item $\bar{T}_m$ and $T_m$ are assigned equivalent to $\bar{T}_\tau$ and $T_\tau$, respectively, for the corresponding template $\tau = z_m$.
+\end{itemize}
+
+Hence instead of drawing $\bar{T}_m$ and $T_m$ for modules $m$, we now draw them for templates $\tau$ in the exact same manner:
+
+\begin{align*}
+\bar{T}_{\tau} \sim \text{GEM}(\alpha_2)  \\
+T_\tau(\cdot|s,a) \sim \text{DP}(\alpha_3, \bar{T}_\tau) ,\,\,\forall s \in \tau
+\end{align*}
+
+Modules are assigned to templates according to:
+
+\begin{align*}
+\beta \sim \text{GEM}(\gamma) \\
+z_m \sim \beta \\
+\bar{T}_{m} \equiv \bar{T}_{\tau},  \text{ where } \tau = z_m \\
+T_m(\cdot|s,a) \equiv T_\tau(\cdot | s,a), \text{ where } \tau = z_m 
+\end{align*}
+
+
+
+
 
 \subsubsection{Shared observations}
 
 \subsubsection{Shared rewards}
 
 
+code it up
 
-
-
-\subsection{hierarchical iHMM as HDP}
-
-
-\begin{align*}
-\beta \sim \text{GEM}(...) \\
-z_s \sim \text{Mult}(\beta) \\
-\bar{T} \sim \text{GEM}(...) \\
-\bar{T}_c \sim \text{DP}(..., \bar{T}) \\
-T(.|s) = T_s \sim \text{DP}(..., \bar{T}_{z_s}) \\
-\phi_s \sim H \\
-s_t \sim T_{s_{t-1}} \\
-o_t \sim F(\phi_{s_t})
-\end{align*}
-
-
-\begin{align*}
-H_c \sim ... \\
-\phi_s \sim H_{z_s}
-\end{align*}
-
-
-\subsection{hierarchical iHMM as HDP, version 2}
-
-
-
-\begin{align*}
-\bar{T} \sim \text{GEM}(...) \\
-T(.|c) = T_c \sim \text{DP}(..., \bar{T}) \\
-\bar{T}_{c,\cdot} \sim \text{GEM}(...) \\
-T(. \in c | s \in c) = T_{c,s} \sim \text{DP}(..., \bar{T}_{c,\cdot}) \\
-T_s(s') = T(s'|s) = \begin{cases}  T_{c,s}(s') \,\, T_c(c) & \text{ if } s, s' \in c \\  \bar{T}_{c',\cdot}(s') \,\, T_c(c') & \text{ if } s \in c, s' \in c'  \end{cases} \\
-\phi_s \sim H \\
-s_t \sim T_{s_{t-1}} \\
-o_t \sim F(\phi_{s_t})
-\end{align*}
-
-
-\subsection{hierarchical iHMM as HDP, version 3}
-
-
-
-\begin{align*}
-\beta \sim \text{GEM}(...) \\
-z_c \sim \text{Mult}(\beta) \\
-\bar{T}_{g,\cdot} \sim \text{GEM}(...) \\
-T_{g,s} \sim \text{DP}(..., \bar{T}_{g,\cdot}) \\
-\bar{T} \sim \text{GEM}(...) \\
-T(.|c) = T_c \sim \text{DP}(..., \bar{T}) \\
-\bar{T}_{c,\cdot} = \bar{T}_{g=z_c,\cdot} \\
-T(. \in c | s \in c) = T_{c,s} = T_{g=z_c,s}\\
-T_s(s') = T(s'|s) = \begin{cases}  T_{c,s}(s') \,\, T_c(c) & \text{ if } s, s' \in c \\  \bar{T}_{c',\cdot}(s') \,\, T_c(c') & \text{ if } s \in c, s' \in c'  \end{cases} \\
-\phi_s \sim H \\
-s_t \sim T_{s_{t-1}} \\
-o_t \sim F(\phi_{s_t})
-\end{align*}
 
 
 \bibliographystyle{unsrt}

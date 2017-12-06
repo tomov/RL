@@ -28,13 +28,6 @@
 
 \section{Background} 
 
-Define MDPs, RL framework
-POMDPs
-Multi-task RL
-HRL = sMDPs
-Option discovery as hidden state inference
-POMDP formulation for one environment
-Multi-task POMDP
 
 \subsection{Reinforcement Learning and Markov Decision Processes}
 
@@ -245,7 +238,7 @@ An example iPOMDP is shown in Figure~\ref{fig:nested}A.
 
 \subsection{Modular iPOMDPs}
 
-Combining MTRL with iPOMDPs allows the agent to learn and transfer policies across tasks with arbitrary state spaces and transition structures. However, it is still unclear how options would arise in such a framework. Intuitively, options imply a certain modular structure, such that some parts of the state space have characteristic transition functions or observation distributions which are repeated across POMDPs or even within the same POMDP. Learning an appropriate sequence of actions in one of those modules will allow the agent to transfer it to other instances of the same module. 
+Combining MTRL with iPOMDPs allows the agent to learn and transfer policies across tasks with arbitrary state spaces and transition structures. However, it is still unclear how options would arise in such a framework. Intuitively, options imply a certain modular structure, such that some parts of the state space have characteristic transition structures or observation distributions which are repeated across POMDPs or even within the same POMDP. Learning an appropriate sequence of actions in one of those modules will allow the agent to transfer it to other instances of the same module.
 
 \subsubsection{Module-specific popularity vectors}
 
@@ -288,9 +281,9 @@ r_t \sim R(\cdot | s_{t-1}, a_{t-1})
 
 Unlike regular iPOMDPs, here there is a separate average transition distribution $\bar{T}_m$ for each module $m$. Importantly, that distribution is artificially skewed to prefer states within $m$. The parameter $\xi$ controls the bias for within-module transitions, with $\xi = 0$ leading to no bias. The concentration parameter $\gamma$ determines whether the prior is biased towards a small or a large number of modules.
 
-The module-specific average transition distributions would allow the model to discover the modular or ``community'' structure of tasks in the environment that people are capable of inferring \cite{Schapiro2013, Solway2014}. However, since each transition distribution $T(\cdot|s,a)$ is drawn independently (conditional on $\bar{T}_m$), each module will have its own unique transition structure. An option learned in one module would not apply to a different module.
-
 An example modular iPOMDP is shown in Figure~\ref{fig:nested}B.
+
+The module-specific average transition distributions would allow the model to discover the modular or ``community'' structure of tasks in the environment, something is characteristic of human behavior \cite{Schapiro2013, Solway2014}. However, since each transition distribution $T(\cdot|s,a)$ is drawn independently (conditional on $\bar{T}_m$), each module will have its own unique transition structure. An option learned in one module would not apply to a different module.
 
 \subsubsection{Nested iPOMDPs}
 
@@ -331,17 +324,15 @@ As before, it makes sense to introduce a bias that favors transitions within mod
 T(m'|m) \leftarrow \begin{cases}  \frac{1 + \xi}{1 + \xi T(m|m)} \,\, T(m|m) \,\,\text{ if }m' = m    \\  \frac{1}{1 + \xi T(m|m)} \,\, T(m'|m)\,\,\text{ if }m' \ne m  \end{cases}
 \end{align*}
 
-Now each module has its own separate transition structure defined by $T_m$. Even though each module is still unique, this version of the model allows us to adapt iPOMDPs for MTRL in a way that naturally gives rise to options.
+Now each module has its own separate transition structure defined by $T_m$. Even though each module is still unique, this version of the model allows us to bias the prior towards repeated modules, which would naturally give rise to options.
 
-An example nested iPOMDP is shown in Figure~\ref{fig:nested}C.
+An example of nested iPOMDPs is shown in Figure~\ref{fig:nested}C.
 
-\subsection{MTRL with nested iPOMDPs}
+\subsubsection{Nested iPOMDPs with templates}
 
-There are different ways to adapt nested iPOMDPs to the MTRL framework that will facilitate the acquisition and transfer of different kinds of options.
+One way to bias the prior towards repeated structures to allow transition structures to be shared between different modules. Thus two different modules $m$ and $m'$ may have identical state transition structures $T_m \equiv T_{m'}$.
 
-\subsubsection{Shared module templates}
-
-An apparent extension is to allow transition structures to be shared between different modules. Thus two different modules $m$ and $m'$ may have identical state transition structures $T_m \equiv T_{m'}$. To accomplish this, it is convenient to introduce \textit{templates} $\tau$ that define unique transition structures $T_{\tau}$. Each module $m$ is assigned to a template $\tau$, resulting in $T_m \equiv T_\tau$. 
+To accomplish this, it is convenient to introduce \textit{templates} $\tau$ that define unique transition structures $T_{\tau}$. Each module $m$ is assigned to a template $\tau$, resulting in $T_m \equiv T_\tau$. 
 
 We introduce the following components to the nested iPOMDP generation process:
 
@@ -349,7 +340,7 @@ We introduce the following components to the nested iPOMDP generation process:
 \item $\bar{T}_\tau$ and $T_\tau$ are drawn in the same way as $\bar{T}_m$ and $T_m$, respectively, except defined for templates $\tau$ instead of modules $m$.
 \item A template popularity vector $\beta$ is drawn from a stick-breaking process with concentration parameter $\gamma$.
 \item A template assignment $z_m$ is drawn for each module $m$ from a categorial distribution defined by $\beta$.
-\item $\bar{T}_m$ and $T_m$ are assigned equivalent to $\bar{T}_\tau$ and $T_\tau$, respectively, for the corresponding template $\tau = z_m$.
+\item $\bar{T}_m$ and $T_m$ are assigned equal to $\bar{T}_\tau$ and $T_\tau$, respectively, for the corresponding template $\tau = z_m$.
 \end{itemize}
 
 Hence instead of drawing $\bar{T}_m$ and $T_m$ for modules $m$, we now draw them for templates $\tau$ in the exact same manner:
@@ -368,16 +359,37 @@ z_m \sim \beta \\
 T_m(\cdot|s,a) \equiv T_\tau(\cdot | s,a), \text{ where } \tau = z_m 
 \end{align*}
 
-An example nested iPOMDP with templates is shown in Figure~\ref{fig:nested}D.
+An example of nested iPOMDPs with templates is shown in Figure~\ref{fig:nested}D.
 
+\subsection{MTRL with nested iPOMDPs}
 
+There are different ways to adapt nested iPOMDPs to the MTRL framework that will facilitate the acquisition and transfer of different kinds of options.
+
+\subsubsection{Prior over tasks}
+
+One convenient choice is a Chinese restaurant process (CRP) \cite{Teh2006} prior over tasks. Intuitively, we can think of time as being divided into discrete episodes (or trials). At the start of each episode, the agent is presented with a task, which is either identical to a task seen in a previous episode, or is an entirely new task. The CRP prior favors a rich-gets-richer dynamic whereby tasks which are selected frequently tend to be selected even more frequently.
+
+Formally, if the distinct tasks are indexed by $k = 1..K$, then on episode $e$, the task is drawn according to: 
+
+\begin{align*}
+P(\text{task}_e = k | \text{task}_0, \text{task}_1 ... \text{task}_{e-1} ) \propto \begin{cases}  n_k  & \text{ if } k \le K \\ \alpha & \text{ if } k = K + 1\end{cases}
+\end{align*}
+
+where $K$ is the number distinct tasks presented so far, $n_k$ is the number of times task $k$ has been chosen before, and $\alpha$ is a concentration parameter.
+
+In our case, the tasks are represented by nested iPOMDPs. During each episode, the agent can use the CRP prior to decide whether it is learning a new iPOMDP, or whether it is performing in a previously encountered iPOMDP.
+
+\subsubsection{Shared templates}
+
+In the framework presented so far, templates are defined separately for each iPOMDP. In order to allow the acquisition of options that apply across multiple iPOMDPs, we can allow templates to be shared across iPOMDPs. This can be done in a straightforward manner by drawing $\bar{T}_\tau$ and $T_\tau$ once and using them in all iPOMDPs. 
 
 \subsubsection{Shared observations}
 
 \subsubsection{Shared rewards}
 
+\subsubsection{Classes of tasks}
 
-code it up
+
 
 
 

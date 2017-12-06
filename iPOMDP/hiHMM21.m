@@ -4,7 +4,7 @@
 %
 clear all; close all;
 
-rng(1);
+rng(12);
 
 H = @() rand(1,2) * 20; % base distribution
 O = @(theta) mvnrnd(theta, [1 0; 0 1]); % observation distribution
@@ -18,7 +18,7 @@ alpha_4 = 10;
 
 
 G = 3; % # of groups of communities
-C = 10; % # of "communities" = clusters of states
+C = 5; % # of "communities" = clusters of states
 S = 20; % # of states in each community
 N = 100; % # observations = # of time points
 
@@ -32,6 +32,8 @@ T_mean_c = nan(C,S); % popularity of each state in community c
 T_c_s = nan(S,S,C); % T(s,s',c) = T(s'|s,c) if s,s' in c
 
 phi = nan(S,2,C); % parameters for observation distribution for each state: o ~ O(.|s) = O(phi_s)
+
+xi = 1; % preference for within-community transitions
 
 % draw group popularities
 %
@@ -72,6 +74,9 @@ T_mean = GEM(alpha_0, C);
 %
 for c = 1:C % for each previous community c
     T_c(c,:) = DP(alpha_1, T_mean);
+    
+    T_c(c,c) = T_c(c,c) + xi; %  * (1 + xi); % TODO FIXME THIS IS A HACK!!!!!!
+    T_c(c,:) = T_c(c,:) / sum(T_c(c,:));    
 end
 
 % draw average state transition within each community

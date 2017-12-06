@@ -231,7 +231,17 @@ The popularity vector $\bar{T}$ and the transition vectors $T(\cdot | s,a)$ are 
 
 Importantly, since the agent can only perceive a finite number of observations during its lifetime, it will only ever need to learn about a finite number of states.
 
+An example iPOMDP is shown in Figure~\ref{fig:nested}A.
+
 \section{The Model}
+
+
+\begin{figure}
+\centering
+\includegraphics[scale=1,  trim = 0 120 400 10]{figures/nested.pdf}
+\caption{(A) The transition probabilities $T(s_t| s_{t-1}, a_{t-1})$ for a fixed action $a_t$ in a iPOMDP sampled from the prior. (B) Transition probabilities of a modular iPOMDP with module-specific popularity vectors. (C) Transition probabilities of a modular iPOMDP with nested iPOMDPs. (D) Transition probabilities for nested iPOMDPs with templates. Notice that the within-module transition structures of the first two modules (top left) are identical since they are taken from the same template. Similarly, the within-module transition structures of the last three modules (bottom right) are also identical but drawn from a different template.}
+\label{fig:nested}
+\end{figure}
 
 \subsection{Modular iPOMDPs}
 
@@ -280,6 +290,8 @@ Unlike regular iPOMDPs, here there is a separate average transition distribution
 
 The module-specific average transition distributions would allow the model to discover the modular or ``community'' structure of tasks in the environment that people are capable of inferring \cite{Schapiro2013, Solway2014}. However, since each transition distribution $T(\cdot|s,a)$ is drawn independently (conditional on $\bar{T}_m$), each module will have its own unique transition structure. An option learned in one module would not apply to a different module.
 
+An example modular iPOMDP is shown in Figure~\ref{fig:nested}B.
+
 \subsubsection{Nested iPOMDPs}
 
 In order to facilitate the acquisition of options, modules need to be repeated, which is infeasible with the previous approach. The easiest way to achieve this is by treating modules as self-contained units. One way to accomplish this is by inducing a separate iPOMDP for each module, which would be ``nested'' in a higher-level iPOMDP defined over modules.
@@ -321,11 +333,13 @@ T(m'|m) \leftarrow \begin{cases}  \frac{1 + \xi}{1 + \xi T(m|m)} \,\, T(m|m) \,\
 
 Now each module has its own separate transition structure defined by $T_m$. Even though each module is still unique, this version of the model allows us to adapt iPOMDPs for MTRL in a way that naturally gives rise to options.
 
+An example nested iPOMDP is shown in Figure~\ref{fig:nested}C.
+
 \subsection{MTRL with nested iPOMDPs}
 
 There are different ways to adapt nested iPOMDPs to the MTRL framework that will facilitate the acquisition and transfer of different kinds of options.
 
-\subsubsection{Shared modules}
+\subsubsection{Shared module templates}
 
 An apparent extension is to allow transition structures to be shared between different modules. Thus two different modules $m$ and $m'$ may have identical state transition structures $T_m \equiv T_{m'}$. To accomplish this, it is convenient to introduce \textit{templates} $\tau$ that define unique transition structures $T_{\tau}$. Each module $m$ is assigned to a template $\tau$, resulting in $T_m \equiv T_\tau$. 
 
@@ -354,7 +368,7 @@ z_m \sim \beta \\
 T_m(\cdot|s,a) \equiv T_\tau(\cdot | s,a), \text{ where } \tau = z_m 
 \end{align*}
 
-
+An example nested iPOMDP with templates is shown in Figure~\ref{fig:nested}D.
 
 
 

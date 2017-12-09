@@ -226,42 +226,56 @@ Importantly, since the agent can only perceive a finite number of observations d
 
 An example iPOMDP is shown in Figure~\ref{fig:nested}A.
 
+
+
+
 \subsection{Motivating Examples}
 
 \begin{figure}
 \centering
-\includegraphics[scale=1,  trim = 0 20 400 10]{figures/examples.pdf}
-\caption{(A) Rooms domain from \cite{Sutton1999}, adapted from \cite{Botvinick2008}. G, goal state, S, starting state. (B) Upper left room with its corresponding option policy (arrows) leading to the subgoal state (SG). Colors indicate option-specific state values.}
+\includegraphics[scale=1,  trim = 20 20 10 10]{figures/examples.pdf}
+\caption{(A) Rooms domain from \cite{Sutton1999}, adapted from \cite{Botvinick2008}. G, goal state, S, starting state. (B) Upper left room with its corresponding option policy (arrows) leading to the subgoal state (SG). Colors indicate option-specific state values. (C) Transition structure in a rooms domain, with transitions averaged over all four primitive actions (i.e. assuming a random walk). (D) Taxi domain from \cite{Dietterich2000}. (E) Transition structure in a taxi domain for given pickup and drop-off location (averaged over all actions). (F) Graph studied by Schapiro et al. \cite{Schapiro2013}. (G) Corresponding transition structure. (H) Graphs from Solway et al. \cite{Solway2014}. (I) Corresponding transition structures.}
 \label{fig:examples}
 \end{figure}
 
-While the ultimate goal of this project is to design a generative model and inference machinery for a wide range of natural tasks, it is helpful to consider a few illustrative examples of constrained tasks people use to study HRL and actions sequences.
+While the ultimate goal of this project is to design a generative model and inference machinery for a wide range of natural tasks, it is helpful to consider a few illustrative examples of constrained tasks used to study HRL and actions sequences.
 
 \subsubsection{Machine Learning}
 
-\paragraph{Rooms domain} A popular task used to illustrate HRL is the rooms domain (Figure~\ref{fig:examples}A and B), which consists of a grid world in which some locations (states) are passable while others are not, dividing the space into rooms. Transitions are deterministic and there is often a single goal state in which the task terminates. Usually any transition to the goal state gives some fixed reward, while all other transitions yield zero reward. Alternatively, all states have a negative reward associated with them, with the exception of the goal state which has zero reward. In both cases, the optimal policy is the shortest path from the agent's starting state to the goal state.
+\paragraph{Rooms domain} A popular task used to illustrate HRL is the rooms domain (Figure~\ref{fig:examples}A, B, and C), which consists of a grid world in which some locations (states) are passable while others are not, dividing the space into rooms. There are four primitive actions: up, down, left, right. Transitions are deterministic and there is often a single goal state in which the task terminates. Usually any transition to the goal state gives some fixed reward, while all other transitions yield zero reward. Alternatively, all states have a negative reward associated with them, with the exception of the goal state which has zero reward. In both cases, the optimal policy is the shortest path from the agent's starting state to the goal state.
 
 In such tasks, options arise naturally, with subgoals corresponding to the doorways between the rooms. If the reward is not in the same room as the agent, then it would have to go explore an adjacent room as fast as possible. Thus it helps to have option policies that lead to the exit of each room from any location within that room. That way the agent can directly perform the option ``go to doorway X'' and just follow the corresponding option policy.
 
 \paragraph{Taxi domain}
 
-Another classic task used to study HRI is taxi domain \cite{Dietterich1998}. TODO structure, figure 
+Another classic task used to study HRI is taxi domain \cite{Dietterich2000} (Figure~\ref{fig:examples}D and E). It is a 5-by-5 grid world in which there are four passenger pick up / drop off locations. Time is broken into episodes. In each episode, there is a passenger in one of the four locations (the pickup location) who desires to go to another one of the four locations (the drop-off location). The taxi (agent) starts in a random location and has to navigate to the pickup location, pick up the passenger, navigate to the drop-off location, and drop off the passenger. The rewards are set up to encourage the shortest path. There are six primitive actions: up, down, left, right, pick up, drop off. 
 
-repeated modules, densely connected, similar observations
+In this domain, it is useful to have an option for navigating to each of the four designated pickup / drop-off locations. Notice that the structure of the taxi domain resembles many real-world tasks in which an agent needs to perform some action in one location before performing another action in a different location, such as picking up a key to unlock a door.
 
-subgoals / parse cross-module 
-
-for each action; collapsed all actions 
 
 \subsubsection{Humans}
 
-While the ultimate goal of this project can be seen as discovering a generative distribution 
+\paragraph{Community structure}
+
+Schapiro et al. \cite{Schapiro2013} performed a study in which participants experienced random walks in a graph and had to press a button whenever they perceived a ``boundary'' event (Figure~\ref{fig:examples}F). Participants pressed more on transitions between clusters (or ``communities'') of interconnected nodes in the graph, suggesting that they intuited the underlying structure. The study further showed that this community structure is reflected in neural activity, with some brain areas showing similar activity for states in the same community.
+
+Even though there are no actions in this task, one can imagine that if it were converted to a navigation task with a randomly chosen start state and goal state, it would be useful to have options for navigating between the communities. Solway et al. \cite{Solway2014} showed that, under these assumptions, this is indeed the optimal subtask decomposition of this domain.
+
+Solway et al. \cite{Solway2014} performed a study in which participants were asked to navigate in different domains with community structure. In their first experiment (Figure~\ref{fig:examples}H, top), participants learned the adjacency relations among locations in a virtual town. When asked to pick an optimal location for a bus stop in order to speed up deliveries between locations, participants tended to pick the locations corresponding to topological bottlenecks, suggesting that they discovered the community structure. In the second experiment, participants were explicitly asked to navigate between locations in a different domain (Figure~\ref{fig:examples}H, bottom). Participants were able to quickly indicate that the bottleneck states would lie on a shortest path between two random states, again indicating that they discovered the community structure.
+
 
 
 \subsubsection{Monkeys}
 
 
 \subsubsection{Rodents}
+
+
+
+
+
+
+
 
 
 

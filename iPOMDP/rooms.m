@@ -1,4 +1,4 @@
-rooms = [ ...
+domain = [ ...
     '##################'; ...
     '#.......#........#'; ...
     '#................#'; ...
@@ -24,9 +24,22 @@ clust = [ ...
     '##################'; ...
     ];
 
+% solway
+domain = [...
+    '...#...'; ...
+    '.......'; ...
+    '...#...'; ...
+    ];
+clust = [...
+    '111#222'; ...
+    '1113222'; ...
+    '111#222'; ...
+    ];
+
+
 close all; 
 
-S = numel(rooms);
+S = numel(domain);
 
 actions = {'right', 'down', 'left', 'up'};
 dirs = {[0, 1], [1, 0], [0, -1], [-1, 0]};
@@ -36,13 +49,13 @@ A = numel(dirs);
 T = zeros(S,S,A); % transitions (s,s') for each action a = 1..A
 C = zeros(1,S); % clusters
 
-for x = 1:size(rooms,1)
-    for y = 1:size(rooms,2)
-        if rooms(x,y) ~= '.'
+for x = 1:size(domain,1)
+    for y = 1:size(domain,2)
+        if domain(x,y) ~= '.'
             continue;
         end
 
-        s = sub2ind(size(rooms), x, y);
+        s = sub2ind(size(domain), x, y);
         if clust(x,y) ~= '.'
             C(s) = num2str(clust(x,y));
         end
@@ -50,10 +63,10 @@ for x = 1:size(rooms,1)
             dir = dirs{a};
             x_new = x + dir(1);
             y_new = y + dir(2);
-            if x_new < 1 || x_new > size(rooms, 1) || y_new < 1 || y_new > size(rooms, 2) || rooms(x_new, y_new) ~= '.'
+            if x_new < 1 || x_new > size(domain, 1) || y_new < 1 || y_new > size(domain, 2) || domain(x_new, y_new) ~= '.'
                 continue;
             end
-            s_new = sub2ind(size(rooms), x_new, y_new);
+            s_new = sub2ind(size(domain), x_new, y_new);
             
             T(s, s_new, a) = 1;
         end

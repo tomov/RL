@@ -148,6 +148,9 @@ INPUT ./figures/pomdp.pdf
 INPUT ./figures/pomdp.pdf
 INPUT /usr/local/texlive/2017/texmf-dist/fonts/tfm/public/cm/cmbx8.tfm
 INPUT /usr/local/texlive/2017/texmf-dist/fonts/tfm/public/cm/cmbx6.tfm
+INPUT figures/examples.pdf
+INPUT ./figures/examples.pdf
+INPUT ./figures/examples.pdf
 INPUT figures/nested.pdf
 INPUT ./figures/nested.pdf
 INPUT ./figures/nested.pdf

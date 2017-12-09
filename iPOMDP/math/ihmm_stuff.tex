@@ -87,7 +87,7 @@ The rewards can be computed as:
 R(s,o) = \mathbb{E} \left[ \sum_{t=0}^\infty \gamma^t r_t \middle| s_0 = s, a_t \sim \pi_o \right]
 \end{align*}
 
-It is also convenient to define a discounted distribution of terminal states \cite{Sutton1999}:
+It is also convenient to define a discounted distribution of subgoal states \cite{Sutton1999}:
 
 \begin{align*}
 T_\gamma(s'|s,o) = \sum_{t=0}^\infty T(s',t|s,a) \gamma^t
@@ -283,7 +283,7 @@ Unlike regular iPOMDPs, here there is a separate average transition distribution
 
 An example modular iPOMDP is shown in Figure~\ref{fig:nested}B.
 
-The module-specific average transition distributions would allow the model to discover the modular or ``community'' structure of tasks in the environment, something is characteristic of human behavior \cite{Schapiro2013, Solway2014}. However, since each transition distribution $T(\cdot|s,a)$ is drawn independently (conditional on $\bar{T}_m$), each module will have its own unique transition structure. An option learned in one module would not apply to a different module.
+The module-specific average transition distributions would allow the model to discover the modular or ``community'' structure of tasks in the environment, something which is characteristic of human behavior \cite{Schapiro2013, Solway2014}. However, since each transition distribution $T(\cdot|s,a)$ is drawn independently (conditional on $\bar{T}_m$), each module will have its own unique transition structure. An option learned in one module would not apply to a different module.
 
 \subsubsection{Nested iPOMDPs}
 
@@ -297,7 +297,7 @@ Formally, we can generate a two-layer iPOMDP as follows:
 \begin{itemize}
 \item A \textbf{module} popularity vector $\bar{T}$ is drawn from a stick-breaking process with concentration parameter $\alpha_0$, such that $\bar{T}(m')$ corresponds to the average probability that a transition will lead to module $m'$.
 \item A \textbf{module} transition probability vector $T(\cdot | m)$ is drawn from a DP with concentration parameter $\alpha_1$ and base distribution $\bar{T}$ for each module $m$, such that $T(m'|m)$ is the average probability that an action in a state in module $m$ will lead to a state in module $m'$.
-\item A module-specific \textbf{state} popularity vector $\bar{T}_{m}$ is drawn from a stick-breaking process with concentration parameter $\alpha_2$ for each module $m$, such that $\bar{T}_m(s')$ corresponds to the average probability that a transition within module $m$ will lead to state $s'$. This pertains to transitions from and to states within $m$ only.
+\item A module-specific \textbf{state} popularity vector $\bar{T}_{m}$ is drawn from a stick-breaking process with concentration parameter $\alpha_2$ for each module $m$, such that $\bar{T}_m(s')$ corresponds to the average probability that a transition within module $m$ will lead to state $s'$. This pertains to transitions to states within $m$ only.
 \item A module-specific \textbf{state} transition probability vector $T_m(\cdot|s,a)$ is drawn from a DP with concentration parameter $\alpha_3$ and base distribution $\bar{T}_{m}$ for each state-action pair $(s,a)$ within each module $m$. Thus $T_m(s'|s,a)$ is the probability of transitioning to state $s'$ after taking action $a$ in state $s$ within module $m$. Note that both $s$ and $s'$ belong to module $m$.
 \item Global transitions $T(s'|s,a)$ across states (both within and across modules) are defined as follows. If both $s$ and $s'$ are in the same module $m$, then $T(s'|s,a)$ equals the within-module transition probability $T_m(s'|s,a)$, scaled by the probability that a module will transition to itself, $T(m|m)$. If $s$ and $s'$ belong to different modules $m$ and $m'$, respectively, then $T(s'|s,a)$ is taken to be the popularity of $s'$ in module $m'$, $\bar{T}_{m'}(s')$, scaled by the probability of a transition from $m$ to $m'$, $T(m'|m)$.
 \item Reward distributions $R$, observation distributions $O$, states $s_t$, observations $o_t$, and rewards $r_t$ are drawn as for regular iPOMDPs.

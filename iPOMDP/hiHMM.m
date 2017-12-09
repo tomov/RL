@@ -1,5 +1,5 @@
 % Hierarchical iHMM, version 1 -- clusters of states that share the same
-% average transition vector.
+% average transition vector. Example for modular iPOMDP after BD-iHMM
 % Following nomenclature of Teh 2006
 % see iHMM.m for comparison
 %

@@ -1,10 +1,11 @@
-% Hierarchical iHMM, version 2 -- iHMM within a iHMM.
+% Hierarchical iHMM, version 2.1 -- iHMM within a iHMM + community
+% templates (groups). Example for two-layer iPOMDP with templates
 % Following nomenclature of Teh 2006
 % see iHMM.m for comparison
 %
 clear all; close all;
 
-rng(15);
+rng(12);
 
 H = @() rand(1,2) * 20; % base distribution
 O = @(theta) mvnrnd(theta, [1 0; 0 1]); % observation distribution
@@ -14,20 +15,49 @@ alpha_0 = 10;
 alpha_1 = 10;
 alpha_2 = 10;
 alpha_3 = 10;
+alpha_4 = 10;
 
 
+G = 3; % # of groups of communities
 C = 5; % # of "communities" = clusters of states
 S = 20; % # of states in each community
 N = 100; % # observations = # of time points
 
+beta = nan(1,G); % group popularity
+z = nan(1,C); % group assignment for each community
 T_mean = nan(1,C); % average transition for communities = "popularity" of each community
 T_c = nan(C,C); % transition functions between communities
+T_mean_g = nan(G,S); % popularity of each state in group g
+T_g_s = nan(S,S,G); % T(s,s',g) = T(s'|s,g) if s,s' in c in g
 T_mean_c = nan(C,S); % popularity of each state in community c
 T_c_s = nan(S,S,C); % T(s,s',c) = T(s'|s,c) if s,s' in c
 
 phi = nan(S,2,C); % parameters for observation distribution for each state: o ~ O(.|s) = O(phi_s)
 
 xi = 1; % preference for within-community transitions
+
+% draw group popularities
+%
+beta = GEM(alpha_4, G);
+
+% draw cluster assignments to groups
+% z_c ~ Cat(beta)
+%
+for c = 1:C
+    z(c) = find(mnrnd(1, beta));
+end
+
+% draw average state transition within each group
+% and then the actual state-to-state transition within each group
+%
+for g = 1:G
+    T_mean_g(g,:) = GEM(alpha_2, S);
+    
+    for s = 1:S
+        T_g_s(s,:,g) = DP(alpha_3, T_mean_g(g,:));
+    end
+end
+
 
 % draw observation distribution params
 %
@@ -46,19 +76,16 @@ T_mean = GEM(alpha_0, C);
 for c = 1:C % for each previous community c
     T_c(c,:) = DP(alpha_1, T_mean);
     
-    T_c(c,c) = T_c(c,c) + xi; %  * (1 + xi); % TODO FIXME THIS IS A HACK!!!
-    T_c(c,:) = T_c(c,:) / sum(T_c(c,:));
+    T_c(c,c) = T_c(c,c) + xi; %  * (1 + xi); % TODO FIXME THIS IS A HACK!!!!!!
+    T_c(c,:) = T_c(c,:) / sum(T_c(c,:));    
 end
 
 % draw average state transition within each community
 % and then the actual state-to-state transition within each community
 %
 for c = 1:C
-    T_mean_c(c,:) = GEM(alpha_2, S);
-    
-    for s = 1:S
-        T_c_s(s,:,c) = DP(alpha_3, T_mean_c(c,:));
-    end
+    T_mean_c(c,:) = T_mean_g(z(c),:);    
+    T_c_s(:,:,c) = T_g_s(:,:,z(c));
 end
 
 % draw first community based on popularity, then state based on popularity, as well as its observation
@@ -91,6 +118,22 @@ end
 
 %% show transition matrix
 %
+figure;
+
+subplot(2,1,1);
+plot(beta);
+xlabel('g');
+ylabel('\beta');
+title('$\beta$ = popularity of each group', 'interpreter','Latex');
+
+subplot(2,1,2);
+imagesc(T_mean_g);
+xlabel('s');
+ylabel('g');
+title('$\bar{T}_{g,\cdot}$ = state popularity within group $g$', 'interpreter','Latex');
+
+
+
 figure;
 
 subplot(3,1,1);
@@ -158,7 +201,7 @@ figure;
 for c = 1:C
     subplot(1,C,c);
     imagesc(T_c_s(:,:,c));
-    title(['$T_{s,c=', num2str(c), '}$'], 'interpreter','Latex');
+    title(['$T_{s,c=', num2str(c), '}, z_{', num2str(c), '} = ', num2str(z(c)), '$'], 'interpreter','Latex');
 end
 
 

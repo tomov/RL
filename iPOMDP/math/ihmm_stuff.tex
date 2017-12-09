@@ -232,13 +232,29 @@ An example iPOMDP is shown in Figure~\ref{fig:nested}A.
 \begin{figure}
 \centering
 \includegraphics[scale=1,  trim = 0 120 400 10]{figures/nested.pdf}
-\caption{(A) The transition probabilities $T(s_t| s_{t-1}, a_{t-1})$ for a fixed action $a_t$ in a iPOMDP sampled from the prior. (B) Transition probabilities of a modular iPOMDP with module-specific popularity vectors. (C) Transition probabilities of a modular iPOMDP with nested iPOMDPs. (D) Transition probabilities for nested iPOMDPs with templates. Notice that the within-module transition structures of the first two modules (top left) are identical since they are taken from the same template. Similarly, the within-module transition structures of the last three modules (bottom right) are also identical but drawn from a different template.}
+\caption{(A) The transition probabilities $T(s_t| s_{t-1}, a_{t-1})$ for a fixed action $a_t$ in a iPOMDP sampled from the prior. (B) Transition probabilities of a modular iPOMDP with module-specific popularity vectors. (C) Transition probabilities of a two-layer iPOMDP. (D) Transition probabilities for a two-layer iPOMDP with templates. Notice that the within-module transition structures of the first two modules (top left) are identical since they are taken from the same template. Similarly, the within-module transition structures of the last three modules (bottom right) are also identical but drawn from a different template.}
 \label{fig:nested}
 \end{figure}
+
+\subsection{A motivating example}
+
+Consider the taxi domain (Dietterich 2000). TODO structure, figure 
+
+repeated modules, densely connected, similar observations
+
+subgoals / parse cross-module 
+
+for each action; collapsed all actions 
+
+
+
 
 \subsection{Modular iPOMDPs}
 
 Combining MTRL with iPOMDPs allows the agent to learn and transfer policies across tasks with arbitrary state spaces and transition structures. However, it is still unclear how options would arise in such a framework. Intuitively, options imply a certain modular structure, such that some parts of the state space have characteristic transition structures or observation distributions which are repeated across POMDPs or even within the same POMDP. Learning an appropriate sequence of actions in one of those modules will allow the agent to transfer it to other instances of the same module.
+
+
+
 
 \subsubsection{Module-specific popularity vectors}
 
@@ -285,7 +301,10 @@ An example modular iPOMDP is shown in Figure~\ref{fig:nested}B.
 
 The module-specific average transition distributions would allow the model to discover the modular or ``community'' structure of tasks in the environment, something which is characteristic of human behavior \cite{Schapiro2013, Solway2014}. However, since each transition distribution $T(\cdot|s,a)$ is drawn independently (conditional on $\bar{T}_m$), each module will have its own unique transition structure. An option learned in one module would not apply to a different module.
 
-\subsubsection{Nested iPOMDPs}
+
+
+
+\subsubsection{Two-layer iPOMDPs}
 
 In order to facilitate the acquisition of options, modules need to be repeated, which is infeasible with the previous approach. The easiest way to achieve this is by treating modules as self-contained units. One way to accomplish this is by inducing a separate iPOMDP for each module, which would be ``nested'' in a higher-level iPOMDP defined over modules.
 
@@ -297,8 +316,8 @@ Formally, we can generate a two-layer iPOMDP as follows:
 \begin{itemize}
 \item A \textbf{module} popularity vector $\bar{T}$ is drawn from a stick-breaking process with concentration parameter $\alpha_0$, such that $\bar{T}(m')$ corresponds to the average probability that a transition will lead to module $m'$.
 \item A \textbf{module} transition probability vector $T(\cdot | m)$ is drawn from a DP with concentration parameter $\alpha_1$ and base distribution $\bar{T}$ for each module $m$, such that $T(m'|m)$ is the average probability that an action in a state in module $m$ will lead to a state in module $m'$.
-\item A module-specific \textbf{state} popularity vector $\bar{T}_{m}$ is drawn from a stick-breaking process with concentration parameter $\alpha_2$ for each module $m$, such that $\bar{T}_m(s')$ corresponds to the average probability that a transition within module $m$ will lead to state $s'$. This pertains to transitions to states within $m$ only.
-\item A module-specific \textbf{state} transition probability vector $T_m(\cdot|s,a)$ is drawn from a DP with concentration parameter $\alpha_3$ and base distribution $\bar{T}_{m}$ for each state-action pair $(s,a)$ within each module $m$. Thus $T_m(s'|s,a)$ is the probability of transitioning to state $s'$ after taking action $a$ in state $s$ within module $m$. Note that both $s$ and $s'$ belong to module $m$.
+\item A within-module \textbf{state} popularity vector $\bar{T}_{m}$ is drawn from a stick-breaking process with concentration parameter $\alpha_2$ for each module $m$, such that $\bar{T}_m(s')$ corresponds to the average probability that a transition within module $m$ will lead to state $s'$. This pertains to transitions to states within $m$ only.
+\item A within-module \textbf{state} transition probability vector $T_m(\cdot|s,a)$ is drawn from a DP with concentration parameter $\alpha_3$ and base distribution $\bar{T}_{m}$ for each state-action pair $(s,a)$ within each module $m$. Thus $T_m(s'|s,a)$ is the probability of transitioning to state $s'$ after taking action $a$ in state $s$ within module $m$. Note that both $s$ and $s'$ belong to module $m$.
 \item Global transitions $T(s'|s,a)$ across states (both within and across modules) are defined as follows. If both $s$ and $s'$ are in the same module $m$, then $T(s'|s,a)$ equals the within-module transition probability $T_m(s'|s,a)$, scaled by the probability that a module will transition to itself, $T(m|m)$. If $s$ and $s'$ belong to different modules $m$ and $m'$, respectively, then $T(s'|s,a)$ is taken to be the popularity of $s'$ in module $m'$, $\bar{T}_{m'}(s')$, scaled by the probability of a transition from $m$ to $m'$, $T(m'|m)$.
 \item Reward distributions $R$, observation distributions $O$, states $s_t$, observations $o_t$, and rewards $r_t$ are drawn as for regular iPOMDPs.
 \end{itemize}
@@ -306,10 +325,10 @@ Formally, we can generate a two-layer iPOMDP as follows:
 The steps can be summarized as:
 
 \begin{align*}
-\bar{T} \sim \text{GEM}(\alpha_0)      		&& \text{average module transition distribution}  \\
-T(.|m) \sim \text{DP}(\alpha_1, \bar{T})      		&& \text{module transition distributions} \\
-\bar{T}_{m} \sim \text{GEM}(\alpha_2)      		&& \text{average state transition distributions} \\
-T_m(\cdot|s,a) \sim \text{DP}(\alpha_3, \bar{T}_m) ,\,\,\forall s \in m      		&& \text{state transition distributions} \\
+\bar{T} \sim \text{GEM}(\alpha_0)      		&& \text{module popularities}  \\
+T(.|m) \sim \text{DP}(\alpha_1, \bar{T})      		&& \text{module transitions} \\
+\bar{T}_{m} \sim \text{GEM}(\alpha_2)      		&& \text{within-module state popularities} \\
+T_m(\cdot|s,a) \sim \text{DP}(\alpha_3, \bar{T}_m) ,\,\,\forall s \in m      		&& \text{within-module state transitions} \\
 T(s'|s,a) = \begin{cases}  T_m(s'|s,a) \,\, T(m|m) & \text{ if } s, s' \in m \\  \bar{T}_{m'}(s') \,\, T(m'|m) & \text{ if } s \in m, s' \in m'  \end{cases}			&& \text{transitions between all states} \\
 O(\cdot | s,a) \sim H_O \\
 R(\cdot | s,a) \sim H_R \\
@@ -326,15 +345,59 @@ T(m'|m) \leftarrow \begin{cases}  \frac{1 + \xi}{1 + \xi T(m|m)} \,\, T(m|m) \,\
 
 Now each module has its own separate transition structure defined by $T_m$. Even though each module is still unique, this version of the model allows us to bias the prior towards repeated modules, which would naturally give rise to options.
 
-An example of nested iPOMDPs is shown in Figure~\ref{fig:nested}C.
+An example of a two-layer iPOMDP is shown in Figure~\ref{fig:nested}C.
 
-\subsubsection{Nested iPOMDPs with templates}
+
+
+
+
+\subsubsection{Two-layer iPOMDPs with subgoals}
+
+For options to arise, intuitively there need to be certain subgoals. One common definition of subgoals is ``bottleneck'' states, such as doorways or passages, which in our framework would correspond to states which transition from one module to another. Intuitively, we want the cross-module transitions to be sparse, with a few states from one module (the subgoal or \textit{exit} states) transitioning to a few states to another module (the \textit{entrance} states). 
+
+Two-layer iPOMDPs as defined above posit that each state from a given module $m$ has the same transition distribution for all states in another module $m'$, which is implausible (notice the off-diagonal structure in Figure~\ref{fig:nested}C).
+
+We would like to define \textbf{cross-module} state transition distributions $T_{m,m'}(s'|s,a)$, specifying the probability of transitioning from state $s \in m$ to state $s' \in m'$ after taking action $a$ (for $m \ne m'$). We also want this distribution to be sparse, i.e. all probabilities would be zero for most states $s$, except for a few states $s$ (the exit states of $m$) which would transition to a few states $s'$ (the entrance states of $m'$). One way to achieve this is by selecting a single exit state $s_{m,m'}$ that acts as a ``bridge'' from module $m$ to module $m'$:
+
+\begin{itemize}
+\item An \textbf{exit state} probability vector $\bar{T}_{m,\cdot}$ is drawn from a GEM with concentration parameter $\alpha_4$, specifying which states in module $m$ are likely to be exit states.
+\item An \textbf{entrance state} probability vector $\bar{T}_{\cdot,m'}$ is drawn from a GEM with concentration parameter $\alpha_5$, specifying which states in module $m'$ are likely to be entrance states.
+\item A single \textbf{exit state} $s_{m,m'} \in m$ is chosen according to $\bar{T}_{m,\cdot}$ for each pair of distinct modules $m, m'$. Its transition distribution $T_{m,m'}(\cdot|s,a)$ to states $s' \in m'$ is then chosen according to a DP with base distribution $\bar{T}_{\cdot,m'}$ and concentration parameter $\alpha_6$.
+\item Global transitions $T(s'|s,a)$ are modified accordingly.
+\end{itemize}
+
+Thus the overall two-layer iPOMDP generation process can be summarized as:
+
+\begin{align*}
+\bar{T} \sim \text{GEM}(\alpha_0)      		&& \text{module popularities}  \\
+T(.|m) \sim \text{DP}(\alpha_1, \bar{T})      		&& \text{module transitions} \\
+\bar{T}_{m} \sim \text{GEM}(\alpha_2)      		&& \text{within-module state popularities} \\
+T_m(\cdot|s,a) \sim \text{DP}(\alpha_3, \bar{T}_m) ,\,\,\forall s \in m      		&& \text{within-module state transitions} \\
+\bar{T}_{m,\cdot} \sim \text{GEM}(\alpha_4)      		&& \text{exit state popularities}  \\
+\bar{T}_{\cdot,m'} \sim \text{GEM}(\alpha_5)      		&& \text{entrance state popularities}  \\
+s_{m,m'} \sim \bar{T}_{m,\cdot}					&& \text{exit states}  \\
+T_{m,m'}(\cdot|s,a) \sim \text{DP}(\alpha_6, \bar{T}_{\cdot,m'}),  \text{ for } s = s_{m,m'}      		&& \text{cross-module state transitions} \\
+T(s'|s,a) = \begin{cases}  T_m(s'|s,a) \,\, T(m|m) & \text{ if } s, s' \in m \\  \bar{T}_{m,m'}(s'|s,a) \,\, T(m'|m) & \text{ if } s \in m, s' \in m'  \end{cases}			&& \text{transitions between all states} \\
+O(\cdot | s,a) \sim H_O \\
+R(\cdot | s,a) \sim H_R \\
+s_t \sim T(\cdot | s_{t-1},a_{t-1}) \\
+o_t \sim O(\cdot | s_{t-1}, a_{t-1}) \\
+r_t \sim R(\cdot | s_{t-1}, a_{t-1}) 
+\end{align*}
+
+With the same additional bias for higher $T(m|m)$, favoring within-module transitions.
+
+An example of a two-layer iPOMDP with subgoals is shown in Figure~\ref{fig:nested}E.
+
+
+
+\subsubsection{Two-layer iPOMDPs with templates}
 
 One way to bias the prior towards repeated structures to allow transition structures to be shared between different modules. Thus two different modules $m$ and $m'$ may have identical state transition structures $T_m \equiv T_{m'}$.
 
 To accomplish this, it is convenient to introduce \textit{templates} $\tau$ that define unique transition structures $T_{\tau}$. Each module $m$ is assigned to a template $\tau$, resulting in $T_m \equiv T_\tau$. 
 
-We introduce the following components to the nested iPOMDP generation process:
+We introduce the following components to the two-layer iPOMDP generation process:
 
 \begin{itemize}
 \item $\bar{T}_\tau$ and $T_\tau$ are drawn in the same way as $\bar{T}_m$ and $T_m$, respectively, except defined for templates $\tau$ instead of modules $m$.
@@ -359,11 +422,11 @@ z_m \sim \beta \\
 T_m(\cdot|s,a) \equiv T_\tau(\cdot | s,a), \text{ where } \tau = z_m 
 \end{align*}
 
-An example of nested iPOMDPs with templates is shown in Figure~\ref{fig:nested}D.
+An example of a two-layer iPOMDP with templates is shown in Figure~\ref{fig:nested}D.
 
-\subsection{MTRL with nested iPOMDPs}
+\subsection{MTRL with two-layer iPOMDPs}
 
-There are different ways to adapt nested iPOMDPs to the MTRL framework that will facilitate the acquisition and transfer of different kinds of options.
+There are different ways to adapt two-layer iPOMDPs to the MTRL framework that will facilitate the acquisition and transfer of different kinds of options.
 
 \subsubsection{Prior over tasks}
 
@@ -377,7 +440,7 @@ P(\text{task}_e = k | \text{task}_0, \text{task}_1 ... \text{task}_{e-1} ) \prop
 
 where $K$ is the number distinct tasks presented so far, $n_k$ is the number of times task $k$ has been chosen before, and $\alpha$ is a concentration parameter.
 
-In our case, the tasks are represented by nested iPOMDPs. During each episode, the agent can use the CRP prior to decide whether it is learning a new iPOMDP, or whether it is performing in a previously encountered iPOMDP.
+In our case, the tasks are represented by two-layer iPOMDPs. During each episode, the agent can use the CRP prior to decide whether it is learning a new iPOMDP, or whether it is performing in a previously encountered iPOMDP.
 
 \subsubsection{Shared templates}
 

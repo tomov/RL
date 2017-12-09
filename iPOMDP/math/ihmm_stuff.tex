@@ -264,16 +264,30 @@ Even though there are no actions in this task, one can imagine that if it were c
 Solway et al. \cite{Solway2014} performed a study in which participants were asked to navigate in different domains with community structure. In their first experiment (Figure~\ref{fig:examples}H, top), participants learned the adjacency relations among locations in a virtual town. When asked to pick an optimal location for a bus stop in order to speed up deliveries between locations, participants tended to pick the locations corresponding to topological bottlenecks, suggesting that they discovered the community structure. In the second experiment, participants were explicitly asked to navigate between locations in a different domain (Figure~\ref{fig:examples}H, bottom). Participants were able to quickly indicate that the bottleneck states would lie on a shortest path between two random states, again indicating that they discovered the community structure.
 
 
-
-\subsubsection{Monkeys}
-
-
 \subsubsection{Rodents}
 
+\begin{figure}
+\centering
+\includegraphics[scale=1,  trim = 20 20 10 10]{figures/examples2.pdf}
+\caption{(A) T-maze from \cite{Smith2013b}. (B) Corresponding transition structure (averaged across actions) if the maze is broken down into discrete states akin to the rooms domain. (C) Lever pressing task from Jin et al. \cite{Jin2010}. (D) Corresponding transition structure, with state 1 = no sequence started, state 10 = at reward dispenser, and each lever press leading from state $n$ to state $n+1$. }
+\label{fig:examples2}
+\end{figure}
+
+\paragraph{T-maze} 
+
+The T-maze is frequently used to study habitual behavior in rodents \cite{Smith2013} (Figure~\ref{fig:examples2}A). Animals receive a cue and run down the long arm of the T-maze towards the junction. There is a reward in one of the end-arms, and the animal receives the reward if it turns to the correct arm.
+
+The option in this simple task is defined by the subgoal state corresponding to the maze junction, which is the same both on left-turn and right-turn trials. Smith et al. \cite{Smith2013b} and others have shown that over the course of training, task-bracketing activity emerges in some brain regions of rats, with an increase in neural activity at the junction point of the maze in addition to the beginning and the end of the trial.
+
+\paragraph{Lever pressing}
+
+Jin et al. \cite{Jin2010} studied sequence formation using a lever-pressing task in which mice had to press a lever 8 times in sequence in order to receive a reward (Figure~\ref{fig:examples2}C).
+
+In this self-paced task, a useful option policy would be pressing 8 times in a row. Jin et al. found neural signals corresponding to the initiation and termination of such sequences of lever presses.
 
 
 
-
+\subsubsection{Monkeys}
 
 
 

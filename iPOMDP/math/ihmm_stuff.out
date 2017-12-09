@@ -12,8 +12,8 @@
 \BOOKMARK [2][-]{subsection.1.7}{Motivating Examples}{section.1}% 12
 \BOOKMARK [3][-]{subsubsection.1.7.1}{Machine Learning}{subsection.1.7}% 13
 \BOOKMARK [3][-]{subsubsection.1.7.2}{Humans}{subsection.1.7}% 14
-\BOOKMARK [3][-]{subsubsection.1.7.3}{Monkeys}{subsection.1.7}% 15
-\BOOKMARK [3][-]{subsubsection.1.7.4}{Rodents}{subsection.1.7}% 16
+\BOOKMARK [3][-]{subsubsection.1.7.3}{Rodents}{subsection.1.7}% 15
+\BOOKMARK [3][-]{subsubsection.1.7.4}{Monkeys}{subsection.1.7}% 16
 \BOOKMARK [1][-]{section.2}{The Model}{}% 17
 \BOOKMARK [2][-]{subsection.2.1}{Modular iPOMDPs}{section.2}% 18
 \BOOKMARK [3][-]{subsubsection.2.1.1}{Module-specific popularity vectors}{subsection.2.1}% 19

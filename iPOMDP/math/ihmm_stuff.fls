@@ -151,6 +151,9 @@ INPUT /usr/local/texlive/2017/texmf-dist/fonts/tfm/public/cm/cmbx6.tfm
 INPUT figures/examples.pdf
 INPUT ./figures/examples.pdf
 INPUT ./figures/examples.pdf
+INPUT figures/examples2.pdf
+INPUT ./figures/examples2.pdf
+INPUT ./figures/examples2.pdf
 INPUT figures/nested.pdf
 INPUT ./figures/nested.pdf
 INPUT ./figures/nested.pdf

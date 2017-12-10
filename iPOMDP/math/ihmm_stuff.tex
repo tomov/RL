@@ -478,13 +478,21 @@ T_m(\cdot|s,a) \equiv T_\tau(\cdot | s,a), \text{ where } \tau = z_m
 
 An example of a two-layer iPOMDP with templates is shown in Figure~\ref{fig:nested}E.
 
-\subsection{MTRL with two-layer iPOMDPs}
-
-There are different ways to adapt two-layer iPOMDPs to the MTRL framework that will facilitate the acquisition and transfer of different kinds of options.
-
 \subsubsection{Two-layer iPOMDPs with templates and subgoals}
 
 The iPOMDP with subgoals can easily be extended with templates. An example is shown in Figure~\ref{fig:nested}F.
+
+\paragraph{Templated subgoals}
+
+Additionally, module entrance and exit states could similarly be templated, with the probability vectors $\bar{T}_{m,\cdot}$ and $\bar{T}_{\cdot,m'}$ assigned to corresponding probability vectors $\bar{T}_{\tau,\cdot}$ and $\bar{T}_{\cdot,\tau'}$ (where $\tau = z_m$) that are drawn for templates instead of modules. In this way, modules of the same template will tend to have the same entrance and exit states.
+
+
+
+
+
+\subsection{MTRL with two-layer iPOMDPs}
+
+There are different ways to adapt two-layer iPOMDPs to the MTRL framework that will facilitate the acquisition and transfer of different kinds of options.
 
 \subsubsection{Prior over tasks}
 
@@ -503,6 +511,8 @@ In our case, the tasks are represented by two-layer iPOMDPs. During each episode
 \subsubsection{Shared templates}
 
 In the framework presented so far, templates are defined separately for each iPOMDP. In order to allow the acquisition of options that apply across multiple iPOMDPs, we can allow templates to be shared across iPOMDPs. This can be done in a straightforward manner by drawing $\bar{T}_\tau$ and $T_\tau$ once and using them in all iPOMDPs. 
+
+This would be useful for transferring options 
 
 \subsubsection{Shared observations}
 

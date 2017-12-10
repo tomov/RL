@@ -290,7 +290,7 @@ In this self-paced task, a useful option policy would be pressing 8 times in a r
 \subsubsection{Monkeys}
 
 
-
+Couldn't find any good examples of action sequence learning in monkeys.
 
 
 
@@ -448,7 +448,7 @@ An example of a two-layer iPOMDP with subgoals is shown in Figure~\ref{fig:neste
 While this definition of subgoals conforms nicely to the structure of some of the considered tasks, one exit state per module might be too restrictive. However, I'm not sure how to draw a set of exit states. The HDP formalism doesn't apply straightforwardly here as we need to draw a set of \textit{unique} states. Some variants:
 
 \begin{itemize}
-\item Treat exit states as ``observations'' and just keep drawing from the exit state distribution $\bar{T}_{m,\cdot}$. Would need an additional parameter to decide when to stop drawing (e.g. a Bernoulli distribution parameter). Also have to decide how to handle the repeats.
+\item Treat exit states as ``observations'' and just keep drawing from the exit state distribution $\bar{T}_{m,\cdot}$. Would need an additional ``sparsity'' parameter to decide when to stop drawing (e.g. a Bernoulli distribution parameter). Also have to decide how to handle the repeats.
 \item Decide for each state separately whether it's an exit state based on $\bar{T}_{m,\cdot}$ (e.g. a Bernoulli coin flip). Seems really wrong to use categorical probabilities as Bernoulli probabilities...
 \item Make the cross-module transitions $T_{m,m'}(\cdot|s,a)$ into mixtures between what they are now and $\text{DP}(..., \bar{T}_{m'})$, i.e. what they would have been if $s$ and $s'$ were in the same module. So any state in $m$ can connect to any state in $m'$. But then we're losing the off-diagonal sparsity... Extra care must be taken to weigh down these transitions without weighing down the exit-entrance state transitions.
 \end{itemize}
@@ -498,6 +498,11 @@ The iPOMDP with subgoals can easily be combined with templates. An example is sh
 Additionally, module entrance and exit states could similarly be templated, with the probability vectors $\bar{T}_{m,\cdot}$ and $\bar{T}_{\cdot,m'}$ assigned to corresponding probability vectors $\bar{T}_{\tau,\cdot}$ and $\bar{T}_{\cdot,\tau'}$ (where $\tau = z_m$) that are drawn for templates instead of modules. In this way, modules of the same template will tend to have the same entrance and exit states (notice that we can only duplicate the distributions, since the actual entrance and exit states are drawn for pairs of modules).
 
 
+
+
+
+
+
 \subsection{MTRL with two-layer iPOMDPs}
 
 There are different ways to adapt two-layer iPOMDPs to the MTRL framework that will facilitate the acquisition and transfer of different kinds of options.
@@ -516,37 +521,99 @@ where $K$ is the number distinct tasks presented so far, $n_k$ is the number of 
 
 In our case, the tasks are represented by two-layer iPOMDPs. During each episode, the agent can use the CRP prior to decide whether it is learning a new iPOMDP, or whether it is performing in a previously encountered iPOMDP.
 
-\subsubsection{Shared templates}
+\subsubsection{Shared templates: $\bar{T}_\tau$, $T_\tau$, $\bar{T}_{\tau,\cdot}$, and $\bar{T}_{\cdot,\tau'}$}
 
-In the framework presented so far, templates are defined separately for each iPOMDP. In order to allow the acquisition of options that apply across multiple iPOMDPs, we can allow templates to be shared across iPOMDPs. This can be done in a straightforward manner by drawing $\bar{T}_\tau$ and $T_\tau$ once and using them in all iPOMDPs. 
+In the framework presented so far, templates are defined separately for each iPOMDP. In order to allow the acquisition of option policies that apply across multiple iPOMDPs, we can allow templates to be shared across iPOMDPs. This can be done in a straightforward manner by drawing $\bar{T}_\tau$ and $T_\tau$ once and using them in all iPOMDPs. 
 
-This would be useful for transferring options across tasks. If entrance/exit states are also included in the templates, then distributions over subgoals could also be shared. This would help in task which share parts of their transition structures. A few examples:
+This would be useful for transferring option subgoals across tasks. If exit/entrance states are also included in the templates, then their respective distributions $\bar{T}_{\tau,\cdot}$ and $\bar{T}_{\cdot,\tau'}$ could also be shared. This would help in task which share parts of their transition structures. A few examples:
 
 \paragraph{The taxi domain} Each module corresponds to the grid world for a given passenger (or no passenger) in the taxi (Figure~\ref{fig:examples}E). Since navigation is independent of the passenger, the grid transition structure is copied over exactly as is. Templates will be helpful for:
 
 \begin{itemize}
-\item within-task transfer (e.g. no need to learn how to navigate from scratch after picking up a passenger),
-\item cross-task transfer if templates are shared across iPOMDPs (e.g. no need to learn how to navigate from scratch on episodes with different pickup / drop off locations),
-\item cross-task transfer of subgoals, if the entrance and exit state distributions are part of the templates too. This will occur as the entrance/exit states will naturally map to pickup / drop off locations. After a few tasks, the agent will learn the four key locations as most likely entrance/exit points.
+\item within-task transfer of option policies (e.g. no need to learn how to navigate from scratch after picking up a passenger),
+\item cross-task transfer of option policies, if templates are shared across iPOMDPs (e.g. no need to learn how to navigate from scratch on episodes with different pickup / drop off locations),
+\item cross-task transfer of option subgoals, if the entrance and exit state distributions are part of the templates too. This will occur as the entrance/exit states will naturally map to pickup / drop off locations. After a few tasks, the agent will learn the four key locations as the most likely entrance/exit points.
 \end{itemize}
 
 Crucially, templates will allow transfer if the state space is expanded further, such as adding extra pickup/drop off locations, or the need to refuel \cite{Dietterich1998}, or if the taxi is allowed to venture into neighboring grid worlds. The transition structure for navigating the grid world will just be copied over.
 
-Shared templates will facilitate learning by shaping, i.e. by gradually introducing the agent to more complicated environments with tasks that gradually expand the state space of previously encountered tasks. By learning the appropriate templates in the initial tasks, the agent will be able to quickly learn the more complicated tasks if they are composed of templates inferred in the simpler tasks. This would make certain predictions about the order in which tasks are presented to a naive agent and its ability to generalize.
+Shared templates will facilitate shaping, i.e. learning by gradually introducing the agent to more complicated tasks that gradually expand the state space of previously encountered tasks. By learning the appropriate templates in the initial tasks, the agent will be able to quickly learn the more complicated tasks if they are composed of templates inferred in the simpler tasks. This would make certain predictions about the order in which tasks are presented to a naive agent and its ability to generalize.
 
-\paragraph{}
+\subsubsection{Shared observations: $H_O$}
 
-\subsubsection{Shared observations}
+People tend to be poor at transferring transition structure alone if the states ``look'' drastically different. Consistent with this, it also makes sense for observations within the same module to be drawn from similar distributions. Thus the observation prior $H_O$ can be made module-specific, $H_{O,m}$ (e.g., observations from states in the same room are more similar to each other than to observations from states in a different room). 
 
-People tend to be poor at transferring transition structure alone if the states ``look'' drastically different. Consistent with this, it also makes sense for observations within the same module to be drawn from similar distributions. Thus the observation distributions $H_O$ can be made module-specific (e.g., observations from states in the same room are more similar to each other than to observations from states in a different room). 
+Furthermore, these distributions could be made template-specific, such that modules from the same template induce similar observation distributions (e.g. a given location in the grid world appears similar regardless of whether you have picked up a passenger or not). In the simplest instantiation, the whole observation prior is template-specific, $H_{O,\tau}$, and the modules simply inherit that, $H_{O,m} \equiv H_{O,\tau}$.
 
-Furthermore, these distributions could be made template-specific, such that 
+This will speed up inference in new tasks that reuse old templates. By observing a sequence of observations similar to those seen in a previous template, the agent will quickly be able to infer that that template. This model thus predicts that agents will be faster to infer a familiar transition structure if the states also look similar as before, than if they are completely different.
 
-\subsubsection{Shared rewards}
+In the real world, it is never the case that two environments are exactly identical, or even the same environment over time (e.g. a room during the day versus at night), so optionally it might make sense to draw a module-specific observation prior from a template-specific hyperprior, $H_{O,m} \sim H_{O,\tau}$.
+
+\subsubsection{Shared rewards: $H_R$}
+
+Optimal behavior is ultimately driven by the rewards, which are drawn from the reward distribution $H_R$ for each state-action pair. 
+
+Similarly to the observation distributions, $H_R$ could be made module-specific, $H_{R,m}$, for example with some modules generating fewer or smaller rewards than others.
+
+If reward distributions are also made template-specific, $H_{R,\tau}$, then the agent would be able to infer, for example, that it is in a low-valued module before it has fully explored that module (by inferring its template). Then it would quickly go for the exit state, based on its previous knowledge about the distribution over exit states, $\bar{T}_{\tau,\cdot}$, and the transition structure, $T_\tau$.
+
+\paragraph{The T-maze}
+
+Consider the simple T-maze task (Figure~\ref{fig:examples2}B). Here is how it would fit into our framework:
+
+\begin{itemize}
+\item There are two POMDPs -- one for left-turn trials, and one for right-turn trials.
+\item There are two templates -- template \#1 is a long corridor, and template \#2 is a short corridor.
+\item Each POMDP has 3 modules -- the long arm of the T is from template \#1, and the short arms are from template \#2.
+\item Due to the template-specific $H_{O,\tau}$, the long arm looks similar in both POMDPs, and so do the short arms.
+\item However, state 1 has a distinct observation distribution $O(\cdot|s,a)$ in POMDP \#1 from POMDP \#2. In POMDP \#1, it emits a high-pitched tone, while in POMDP \#2, it emits a low-pitched tone.
+\item In POMDP \#1, the reward distribution $R(\cdot|s,a)$ in the last state in the left-turn short arm has a high mean, while all other states have no rewards. In contrast, in POMDP \#2, it is the last state in the right-turn short arm that has a high mean.
+\end{itemize}
+
+In our framework, the agent will use its initial observation to infer which POMDP it is in, and then make the corresponding turn. The model predicts that, having learned this task structure, the agent would be able to quickly transfer it to other cue modalities (by sharing the templates but drawing different observation distributions $O$), to different reward distributions (by sharing templates but drawing different reward distributions $R$), or to T-mazes with additional arms (by sharing the templates but connecting the modules in a different way).
+
+Depending on the agent's representation of POMDPs, templates, modules, and states, the model can make predictions about similarity between representations when these levels of abstraction vary. For example, the agent might believe it's in the same template (e.g. the long arm of the T-maze) but different POMDPs (e.g. left-turn trial vs. right-turn-trial). Conversely, it might believe it's in different templates (e.g. long arm vs. short arm of the T-maze) but in the same POMDP (e.g. a left-turn trial). These beliefs will change over the course of learning, and the same trial might elicit different beliefs at different points during training, yielding different representations and similarities between them.
 
 
 
-\subsubsection{Classes of tasks}
+
+
+\subsection{MTRL with classes of regular iPOMDPs}
+
+The framework so far considered only a case where each POMDP in the environment is drawn i.i.d. from a common distribution (the CRP prior) (Figure~\ref{fig:mtrl}A). Wilson et al.'s \cite{Wilson2007} contribution to the MTRL framework was introducing classes of tasks, such that tasks are grouped into latent clusters that share similar properties (Figure~\ref{fig:mtrl}B). Inferring those properties allows the agent to quickly learn new tasks drawn from the same class, without interfering with knowledge about tasks outside of that class.
+
+Before using classes of two-layer iPOMDPs, it is worth considering the benefits of introducing classes of regular iPOMDPs. By allowing sharing of different parameters of the iPOMDP generation process within the same class, different information could be learned and transferred. A few examples:
+
+\begin{itemize}
+\item If the transition structure $T$ is shared (i.e. all POMDPs in the same class are assumed to have the same $T$ but different $R$, $O$, etc), then the agent could exhibit latent learning (i.e. adjusting quickly if the rewards or observations change).
+\item If the reward prior $H_R$ is shared within classes, then the agent can learn to distinguish between high-reward and low-reward environments.
+\item If $H_R$ and the observation prior $H_O$ are shared, then the agent can learn things like ``red environments have high rewards, while blue environments have low rewards''.
+\item If $T$ and $H_O$ is shared, then the agent can learn that different stimuli or stimulus dimensions are relevant in different environments. For instance, it could learn that in T-mazes, auditory stimuli are relevant (by having $H_O$ in the T-maze class allow high variance along the auditory dimension of $O$), while in Skinner boxes, LED colors are relevant.
+\item If the concentration parameter $\alpha_0$ is shared, then the agent can distinguish between small and large environments.
+\end{itemize}
+
+Li et al. \cite{Li2009} showed how to perform inference over classes of POMDPs.
+
+\subsection{MTRL with classes of two-layer iPOMDPs (with templates and subgoals)}
+
+
+Despite its power, MTRL with classes of regular iPOMDPs would not give rise to options in the HRL sense, as there is no modular structure.
+
+Here we discuss how we can extend MTRL to classes of two-layer iPOMDPs with templates and subgoals. As with regular iPOMDPs, we can decide which parameters will be shared within classes of tasks. However, we have the complication of templates, which already introduce some correlation between different iPOMDPs. It is therefore easiest to first consider the sharing of features that are not template-specific:
+
+\subsubsection{Shared module transition structures: $T(\cdot|m)$}
+
+While templates allow the sharing of the lower-layer transition structure, classes would allow the sharing of the higher-layer transition structure. Thus iPOMDPs from the same class will have modules that are connected in the same way, but which may vary in their within-module transitions.
+
+For example, imagine the task of finding a key to unlock a door and get room 1 to room 2. The transition structure within each room corresponds to a template. However, because of the state dimension (key, no key), there are two modules for each room, or four modules in total: (room 1, no key), (room 1, key), (room 2, no key), (room 2, key). The transition from (room 1, key) to (room 2
+
+
+
+go as far as you can with these ideas
+
+then consider Sam's example
+
+
 
 
 

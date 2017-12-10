@@ -23,7 +23,9 @@
 \BOOKMARK [3][-]{subsubsection.2.1.5}{Two-layer iPOMDPs with templates and subgoals}{subsection.2.1}% 23
 \BOOKMARK [2][-]{subsection.2.2}{MTRL with two-layer iPOMDPs}{section.2}% 24
 \BOOKMARK [3][-]{subsubsection.2.2.1}{Prior over tasks}{subsection.2.2}% 25
-\BOOKMARK [3][-]{subsubsection.2.2.2}{Shared templates}{subsection.2.2}% 26
-\BOOKMARK [3][-]{subsubsection.2.2.3}{Shared observations}{subsection.2.2}% 27
-\BOOKMARK [3][-]{subsubsection.2.2.4}{Shared rewards}{subsection.2.2}% 28
-\BOOKMARK [3][-]{subsubsection.2.2.5}{Classes of tasks}{subsection.2.2}% 29
+\BOOKMARK [3][-]{subsubsection.2.2.2}{Shared templates: , T, ,, and ,'}{subsection.2.2}% 26
+\BOOKMARK [3][-]{subsubsection.2.2.3}{Shared observations: HO}{subsection.2.2}% 27
+\BOOKMARK [3][-]{subsubsection.2.2.4}{Shared rewards: HR}{subsection.2.2}% 28
+\BOOKMARK [2][-]{subsection.2.3}{MTRL with classes of regular iPOMDPs}{section.2}% 29
+\BOOKMARK [2][-]{subsection.2.4}{MTRL with classes of two-layer iPOMDPs \(with templates and subgoals\)}{section.2}% 30
+\BOOKMARK [3][-]{subsubsection.2.4.1}{Shared module transition structures}{subsection.2.4}% 31

@@ -2,6 +2,7 @@
 % Following nomenclature of Teh 2006
 % see DP_GEM.m for comparison
 %
+close all; clear all;
 
 H = @() rand(1,2) * 20; % base distribution = prior distribution over component parameters. Here, 2D uniform random variable in the square between [0, 0] and [10, 10] 
 F = @(theta) mvnrnd(theta, [1 0; 0 1]); % component distribution, parametrized by theta. Here, 2D Gaussain with fixed covariance and parametrized mean. So we have a 2D Gaussian mixture

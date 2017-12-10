@@ -137,7 +137,7 @@ Wilson et al. \cite{Wilson2007} extended this framework to include \textit{class
 
 \subsubsection{MTRL for HRL}
 
-While Wilson et al.'s approach beings to address the question of policy transfer across MDPs, it leaves open several questions:
+Wilson et al. showed how MTRL can be used when tasks share the same transition structure $T$, while other features such as the goal location and reward distributions vary. While this begins to address the question of policy transfer across MDPs, it leaves open several questions:
 
 \begin{itemize}
 \item How does ambiguity between MDPs arise? Traditional tabular MDPs assume that the agent is fully aware of what state it is in, which implies it is also fully aware of which MDP it is in. In order to be able to perform inference over MDPs, it must be the case that states are in some sense ``shared'' across MDPs, or at least ``look similar''.
@@ -407,7 +407,7 @@ An example of a two-layer iPOMDP is shown in Figure~\ref{fig:nested}C.
 
 \subsubsection{Two-layer iPOMDPs with subgoals}
 
-For options to arise, intuitively there need to be certain subgoals. One common definition of subgoals is ``bottleneck'' states, such as doorways or passages, which in our framework would correspond to states which transition from one module to another. Intuitively, we want the cross-module transitions to be sparse, with a few states from one module (the subgoal or \textit{exit} states) transitioning to a few states to another module (the \textit{entrance} states). 
+For options to arise, there need to be certain states which can be designated as subgoals. One common definition of subgoals is ``bottleneck'' states, such as doorways or passages, which in our framework would correspond to states which transition from one module to another. Intuitively, we want the cross-module transitions to be sparse (Figure~\ref{fig:examples}C,E,G,I, and Figure~\ref{fig:examples2}B,D), with a few states from one module (the subgoal or \textit{exit} states) transitioning to a few states to another module (the \textit{entrance} states). 
 
 Two-layer iPOMDPs as defined above posit that each state from a given module $m$ has the same transition distribution for all states in another module $m'$, which is implausible (notice the off-diagonal structure in Figure~\ref{fig:nested}C).
 
@@ -443,6 +443,15 @@ With the same additional bias for higher $T(m|m)$, favoring within-module transi
 
 An example of a two-layer iPOMDP with subgoals is shown in Figure~\ref{fig:nested}D.
 
+\paragraph{Transitions mixture}
+
+While this definition of subgoals conforms nicely to the structure of some of the considered tasks, one exit state per module might be too restrictive. However, I'm not sure how to draw a set of exit states. The HDP formalism doesn't apply straightforwardly here as we need to draw a set of \textit{unique} states. Some variants:
+
+\begin{itemize}
+\item Treat exit states as ``observations'' and just keep drawing from the exit state distribution $\bar{T}_{m,\cdot}$. Would need an additional parameter to decide when to stop drawing (e.g. a Bernoulli distribution parameter). Also have to decide how to handle the repeats.
+\item Decide for each state separately whether it's an exit state based on $\bar{T}_{m,\cdot}$ (e.g. a Bernoulli coin flip). Seems really wrong to use categorical probabilities as Bernoulli probabilities...
+\item Make the cross-module transitions $T_{m,m'}(\cdot|s,a)$ into mixtures between what they are now and $\text{DP}(..., \bar{T}_{m'})$, i.e. what they would have been if $s$ and $s'$ were in the same module. So any state in $m$ can connect to any state in $m'$. But then we're losing the off-diagonal sparsity... Extra care must be taken to weigh down these transitions without weighing down the exit-entrance state transitions.
+\end{itemize}
 
 
 \subsubsection{Two-layer iPOMDPs with templates}
@@ -478,16 +487,15 @@ T_m(\cdot|s,a) \equiv T_\tau(\cdot | s,a), \text{ where } \tau = z_m
 
 An example of a two-layer iPOMDP with templates is shown in Figure~\ref{fig:nested}E.
 
+Templates would allow agents to quickly infer the transition structure in domains in which large portions of the state space are repeated. While this is unlikely in pure navigation tasks like the rooms domain, it is common in tasks with more complicated state spaces such as the taxi domain (Figure~\ref{fig:examples}E). Even in the rooms domain, most (Figure~\ref{fig:examples}C), a lot of the structure of the rooms is repetitive, and that could be ``templated'' out, with the remaining states assigned to ad-hoc modules. Templates would be useful in state spaces with community structure such as those considered by previous authors (Figure~\ref{fig:examples}G,I). They could also be useful in games with isomorphic structures in the state space, such as the Towers of Hanoi. Finally, repetitive structure also arises in rodent tasks, for example in tasks with two levers where a sequence of presses on each lever leads to a symmetric outcome (e.g. food pellet in the corresponding magazine).
+
 \subsubsection{Two-layer iPOMDPs with templates and subgoals}
 
-The iPOMDP with subgoals can easily be extended with templates. An example is shown in Figure~\ref{fig:nested}F.
+The iPOMDP with subgoals can easily be combined with templates. An example is shown in Figure~\ref{fig:nested}F.
 
 \paragraph{Templated subgoals}
 
-Additionally, module entrance and exit states could similarly be templated, with the probability vectors $\bar{T}_{m,\cdot}$ and $\bar{T}_{\cdot,m'}$ assigned to corresponding probability vectors $\bar{T}_{\tau,\cdot}$ and $\bar{T}_{\cdot,\tau'}$ (where $\tau = z_m$) that are drawn for templates instead of modules. In this way, modules of the same template will tend to have the same entrance and exit states.
-
-
-
+Additionally, module entrance and exit states could similarly be templated, with the probability vectors $\bar{T}_{m,\cdot}$ and $\bar{T}_{\cdot,m'}$ assigned to corresponding probability vectors $\bar{T}_{\tau,\cdot}$ and $\bar{T}_{\cdot,\tau'}$ (where $\tau = z_m$) that are drawn for templates instead of modules. In this way, modules of the same template will tend to have the same entrance and exit states (notice that we can only duplicate the distributions, since the actual entrance and exit states are drawn for pairs of modules).
 
 
 \subsection{MTRL with two-layer iPOMDPs}
@@ -512,11 +520,31 @@ In our case, the tasks are represented by two-layer iPOMDPs. During each episode
 
 In the framework presented so far, templates are defined separately for each iPOMDP. In order to allow the acquisition of options that apply across multiple iPOMDPs, we can allow templates to be shared across iPOMDPs. This can be done in a straightforward manner by drawing $\bar{T}_\tau$ and $T_\tau$ once and using them in all iPOMDPs. 
 
-This would be useful for transferring options 
+This would be useful for transferring options across tasks. If entrance/exit states are also included in the templates, then distributions over subgoals could also be shared. This would help in task which share parts of their transition structures. A few examples:
+
+\paragraph{The taxi domain} Each module corresponds to the grid world for a given passenger (or no passenger) in the taxi (Figure~\ref{fig:examples}E). Since navigation is independent of the passenger, the grid transition structure is copied over exactly as is. Templates will be helpful for:
+
+\begin{itemize}
+\item within-task transfer (e.g. no need to learn how to navigate from scratch after picking up a passenger),
+\item cross-task transfer if templates are shared across iPOMDPs (e.g. no need to learn how to navigate from scratch on episodes with different pickup / drop off locations),
+\item cross-task transfer of subgoals, if the entrance and exit state distributions are part of the templates too. This will occur as the entrance/exit states will naturally map to pickup / drop off locations. After a few tasks, the agent will learn the four key locations as most likely entrance/exit points.
+\end{itemize}
+
+Crucially, templates will allow transfer if the state space is expanded further, such as adding extra pickup/drop off locations, or the need to refuel \cite{Dietterich1998}, or if the taxi is allowed to venture into neighboring grid worlds. The transition structure for navigating the grid world will just be copied over.
+
+Shared templates will facilitate learning by shaping, i.e. by gradually introducing the agent to more complicated environments with tasks that gradually expand the state space of previously encountered tasks. By learning the appropriate templates in the initial tasks, the agent will be able to quickly learn the more complicated tasks if they are composed of templates inferred in the simpler tasks. This would make certain predictions about the order in which tasks are presented to a naive agent and its ability to generalize.
+
+\paragraph{}
 
 \subsubsection{Shared observations}
 
+People tend to be poor at transferring transition structure alone if the states ``look'' drastically different. Consistent with this, it also makes sense for observations within the same module to be drawn from similar distributions. Thus the observation distributions $H_O$ can be made module-specific (e.g., observations from states in the same room are more similar to each other than to observations from states in a different room). 
+
+Furthermore, these distributions could be made template-specific, such that 
+
 \subsubsection{Shared rewards}
+
+
 
 \subsubsection{Classes of tasks}
 

@@ -6,7 +6,7 @@
 % G = sum of pi_k * delta_theta_k, where delta_theta_k is a Kronecher delta f'n at theta_k
 % theta_i ~ G
 % theta_i = the parameters (hence cluster assignment) for observation x_i
-
+close all; clear all;
 
 %rng default;
 
@@ -44,6 +44,7 @@ pi = GEM(alpha, K);
 
 % plot the clusters
 %
+figure;
 C = colormap;
 C = C(randperm(size(C,1)),:); % use different color for each cluster
 
